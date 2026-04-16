@@ -1,8 +1,13 @@
+import { AppButton } from '@/components/ui/AppButton';
+import { AppCard } from '@/components/ui/AppCard';
+import { AppScreen } from '@/components/ui/AppScreen';
+import { AppText } from '@/components/ui/AppText';
+import { Colors, Spacing } from '@/constants/theme';
 import { useScanner } from '@/hooks/useScanner';
 import { Feather } from '@expo/vector-icons';
 import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
 import React, { useEffect, useRef, useState } from 'react';
-import { ActivityIndicator, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { Vibration, View } from 'react-native';
 
 export default function CalibrationScreen() {
   const { id } = useLocalSearchParams();
@@ -13,10 +18,8 @@ export default function CalibrationScreen() {
   const [progress, setProgress] = useState(0);
   const [baselineRssi, setBaselineRssi] = useState<number | null>(null);
   
-  // Use a ref to store samples without triggering re-renders on every ping
   const samplesRef = useRef<number[]>([]);
 
-  // Capture live RSSI pings while calibrating
   useEffect(() => {
     if (isCalibrating && rawRssi !== null) {
       samplesRef.current.push(rawRssi);
@@ -24,6 +27,7 @@ export default function CalibrationScreen() {
   }, [rawRssi, isCalibrating]);
 
   const startCalibration = () => {
+    Vibration.vibrate(100);
     setIsCalibrating(true);
     setProgress(0);
     setBaselineRssi(null);
@@ -40,107 +44,98 @@ export default function CalibrationScreen() {
         clearInterval(interval);
         stopScanning();
         setIsCalibrating(false);
+        Vibration.vibrate([0, 200, 100, 200]); // "Success" vibration pattern
         
-        // Calculate the average RSSI from our 5-second sample window
         const samples = samplesRef.current;
         if (samples.length > 0) {
           const sum = samples.reduce((a, b) => a + b, 0);
           setBaselineRssi(Math.round(sum / samples.length));
         } else {
-          setBaselineRssi(-65); // Fallback standard
+          setBaselineRssi(-65);
         }
       }
     }, 100);
   };
 
   const handleComplete = () => {
-    console.log(`Task ${id} Complete! Bound to Baseline TxPower: ${baselineRssi}`);
-    // Phase D: Send this finalized payload to Supabase
+    // Logic for database commit happens here in Phase D
+    console.log(`Finalizing Task ${id} with Baseline: ${baselineRssi}`);
     router.replace('/staff' as any);
   };
 
   return (
-    <View style={styles.container}>
-      <Stack.Screen 
-        options={{ 
-          title: `CALIBRATE #${id}`,
-          headerStyle: { backgroundColor: '#18181b' },
-          headerTintColor: '#ffffff',
-          headerTitleStyle: { fontWeight: '900' },
-        }} 
-      />
+    <AppScreen>
+      <Stack.Screen options={{ title: 'SIGNAL CALIBRATION', headerShown: true }} />
 
-      <View style={styles.content}>
-        <View style={styles.card}>
-          <View style={styles.iconWrapper}>
-            <Feather name="crosshair" size={32} color="#18181b" />
-          </View>
-          <Text style={styles.title}>1-Meter Baseline</Text>
-          <Text style={styles.subtitle}>
-            Stand exactly 1 meter away from the mounted beacon with your phone at chest height. Ensure there are no physical obstructions between you and the beacon.
-          </Text>
-
-          {baselineRssi === null ? (
-            <TouchableOpacity 
-              activeOpacity={0.8} 
-              style={[styles.primaryButton, isCalibrating && styles.buttonDisabled]} 
-              onPress={startCalibration}
-              disabled={isCalibrating}
-            >
-              {isCalibrating ? (
-                <>
-                  <ActivityIndicator color="#ffffff" size="small" />
-                  <Text style={styles.primaryButtonText}>SAMPLING ({progress}%)...</Text>
-                </>
-              ) : (
-                <Text style={styles.primaryButtonText}>START 5-SECOND SAMPLE</Text>
-              )}
-            </TouchableOpacity>
-          ) : (
-            <View style={styles.resultsContainer}>
-              <View style={styles.successBox}>
-                <Feather name="check-circle" size={24} color="#166534" />
-                <View>
-                  <Text style={styles.successTitle}>CALIBRATION SUCCESSFUL</Text>
-                  <Text style={styles.successDetail}>
-                    Calculated TxPower (1m): {baselineRssi} dBm
-                  </Text>
-                  <Text style={styles.successDetail}>
-                    Samples Collected: {samplesRef.current.length}
-                  </Text>
-                </View>
-              </View>
-
-              <TouchableOpacity 
-                activeOpacity={0.8} 
-                style={styles.completeButton} 
-                onPress={handleComplete}
-              >
-                <Text style={styles.primaryButtonText}>SAVE & COMPLETE TASK</Text>
-              </TouchableOpacity>
-            </View>
-          )}
+      <View style={{ marginBottom: Spacing.xxl, alignItems: 'center' }}>
+        <View style={{ 
+          width: 80, height: 80, borderRadius: 40, 
+          backgroundColor: Colors.borderLight, 
+          justifyContent: 'center', alignItems: 'center',
+          borderWidth: 2, borderColor: Colors.black,
+          marginBottom: Spacing.lg
+        }}>
+          <Feather name="crosshair" size={32} color={Colors.black} />
         </View>
+        <AppText variant="displayMd" center>Baseline Setup</AppText>
+        <AppText variant="bodySm" color="secondary" center style={{ marginTop: Spacing.xs }}>
+          Stand exactly 1 meter away from the beacon at chest height.
+        </AppText>
       </View>
-    </View>
+
+      <AppCard variant={baselineRssi !== null ? 'success' : 'default'}>
+        {baselineRssi === null ? (
+          <View style={{ gap: Spacing.xl }}>
+            <View>
+              <AppText variant="titleSm" center>Calibration Status</AppText>
+              <View style={{ 
+                height: 12, backgroundColor: Colors.borderLight, 
+                borderRadius: 6, marginTop: Spacing.md, overflow: 'hidden',
+                borderWidth: 1, borderColor: Colors.border
+              }}>
+                <View style={{ 
+                  height: '100%', width: `${progress}%`, 
+                  backgroundColor: Colors.black 
+                }} />
+              </View>
+              <AppText variant="caption" color="secondary" center style={{ marginTop: Spacing.sm }}>
+                {isCalibrating ? `SAMPLING DATA... ${progress}%` : 'READY TO START'}
+              </AppText>
+            </View>
+
+            <AppButton 
+              onPress={startCalibration} 
+              disabled={isCalibrating}
+              loading={isCalibrating}
+            >
+              START 5-SECOND SAMPLE
+            </AppButton>
+          </View>
+        ) : (
+          <View style={{ gap: Spacing.lg, alignItems: 'center' }}>
+            <Feather name="check-circle" size={48} color={Colors.successText} />
+            <View style={{ alignItems: 'center' }}>
+              <AppText variant="titleMd" color="success">CALIBRATION SUCCESSFUL</AppText>
+              <AppText variant="displayLg" style={{ marginTop: Spacing.sm }}>
+                {baselineRssi} <AppText variant="titleSm">dBm</AppText>
+              </AppText>
+              <AppText variant="caption" color="secondary">
+                Calculated from {samplesRef.current.length} samples
+              </AppText>
+            </View>
+            
+            <AppButton variant="primary" onPress={handleComplete}>
+              SAVE & COMPLETE TASK
+            </AppButton>
+          </View>
+        )}
+      </AppCard>
+
+      <View style={{ marginTop: Spacing.xl, paddingHorizontal: Spacing.md }}>
+        <AppText variant="caption" color="muted" center>
+          Ensure no physical obstructions are between the phone and the beacon during sampling.
+        </AppText>
+      </View>
+    </AppScreen>
   );
 }
-
-const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#fafafa' },
-  content: { padding: 20, justifyContent: 'center', flex: 1 },
-  card: { backgroundColor: '#ffffff', borderWidth: 2, borderColor: '#18181b', borderBottomWidth: 6, borderRightWidth: 4, borderRadius: 12, padding: 24, alignItems: 'center' },
-  iconWrapper: { width: 64, height: 64, borderRadius: 32, backgroundColor: '#f4f4f5', borderWidth: 2, borderColor: '#18181b', alignItems: 'center', justifyContent: 'center', marginBottom: 16 },
-  title: { fontSize: 20, fontWeight: '900', color: '#18181b', textTransform: 'uppercase', marginBottom: 8 },
-  subtitle: { fontSize: 13, fontWeight: '600', color: '#71717a', textAlign: 'center', marginBottom: 32, lineHeight: 20 },
-  
-  primaryButton: { flexDirection: 'row', backgroundColor: '#18181b', borderRadius: 8, padding: 18, alignItems: 'center', justifyContent: 'center', width: '100%', gap: 10 },
-  buttonDisabled: { backgroundColor: '#a1a1aa' },
-  primaryButtonText: { color: '#ffffff', fontWeight: '900', fontSize: 14, textTransform: 'uppercase', letterSpacing: 1 },
-  
-  resultsContainer: { width: '100%' },
-  successBox: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#dcfce7', padding: 16, borderRadius: 8, borderWidth: 2, borderColor: '#166534', gap: 12, marginBottom: 16 },
-  successTitle: { color: '#166534', fontWeight: '900', fontSize: 14, textTransform: 'uppercase', marginBottom: 4 },
-  successDetail: { color: '#166534', fontWeight: '600', fontSize: 12 },
-  completeButton: { backgroundColor: '#166534', borderRadius: 8, padding: 18, alignItems: 'center', justifyContent: 'center', width: '100%' }
-});

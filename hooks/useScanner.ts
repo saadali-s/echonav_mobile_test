@@ -1,5 +1,6 @@
 import { BEACON_CONFIG } from '@/constants/Config';
-import { useEffect, useRef, useState } from 'react';
+import { useRef, useState } from 'react';
+import { PermissionsAndroid, Platform } from 'react-native';
 import { BleManager } from 'react-native-ble-plx';
 import { useFusionDistance } from './useFusionDistance';
 
@@ -7,44 +8,43 @@ export const useScanner = () => {
   const [rawRssi, setRawRssi] = useState<number | null>(null);
   const [isScanning, setIsScanning] = useState(false);
   const managerRef = useRef<BleManager | null>(null);
-  const [isMockMode, setIsMockMode] = useState(false);
 
   const { distance, metrics, resetFusion } = useFusionDistance(rawRssi);
 
-  // Attempt to initialize the native BLE manager safely
-  useEffect(() => {
-    try {
-      managerRef.current = new BleManager();
-    } catch (error) {
-      console.warn("⚠️ Native BLE not available (Likely running in Expo Go). Falling back to Mock Mode.");
-      setIsMockMode(true);
-    }
-    
-    return () => {
-      if (managerRef.current) {
-        managerRef.current.destroy();
+  const requestBluetoothPermissions = async () => {
+    if (Platform.OS === 'android') {
+      // Android 12+ requires explicit scan/connect permissions
+      if (Platform.Version >= 31) {
+        const granted = await PermissionsAndroid.requestMultiple([
+          PermissionsAndroid.PERMISSIONS.BLUETOOTH_SCAN,
+          PermissionsAndroid.PERMISSIONS.BLUETOOTH_CONNECT,
+          PermissionsAndroid.PERMISSIONS.ACCESS_FINE_LOCATION,
+        ]);
+        return granted[PermissionsAndroid.PERMISSIONS.BLUETOOTH_SCAN] === PermissionsAndroid.RESULTS.GRANTED;
+      } else {
+        // Older Android just needs location
+        const granted = await PermissionsAndroid.request(
+          PermissionsAndroid.PERMISSIONS.ACCESS_FINE_LOCATION
+        );
+        return granted === PermissionsAndroid.RESULTS.GRANTED;
       }
-    };
-  }, []);
+    }
+    return true;
+  };
 
-  const startScanning = () => {
-    console.log("DEBUG: Start Navigation pressed.");
-    setIsScanning(true);
-
-    // --- MOCK MODE (For Expo Go testing) ---
-    if (isMockMode) {
-      console.log("⚠️ Simulating BLE Scan...");
-      setTimeout(() => {
-        if (isScanning) return; // Prevent state updates if stopped early
-        console.log(`TARGET BEACON PING! (SIMULATED) RSSI: -65`);
-        setRawRssi(-65);
-      }, 2000); // Fakes a 2-second search
+  const startScanning = async () => {
+    console.log("DEBUG: Requesting permissions...");
+    
+    const hasPermission = await requestBluetoothPermissions();
+    if (!hasPermission) {
+      console.error("Bluetooth permissions denied by user.");
       return;
     }
 
-    // --- REAL NATIVE MODE ---
     try {
-      if (!managerRef.current) return;
+      if (!managerRef.current) managerRef.current = new BleManager();
+      setIsScanning(true);
+      
       const targetUUID = BEACON_CONFIG.UUID.toLowerCase();
 
       managerRef.current.startDeviceScan(
@@ -63,21 +63,20 @@ export const useScanner = () => {
         }
       );
     } catch (err: any) {
-      console.error("FATAL CRASH AVOIDED:", err);
+      console.error("FATAL CRASH:", err);
       setIsScanning(false);
     }
   };
 
   const stopScanning = () => {
     console.log("DEBUG: Navigation stopped.");
-    if (managerRef.current && !isMockMode) {
+    if (managerRef.current) {
       managerRef.current.stopDeviceScan();
     }
     setIsScanning(false);
   };
 
   const clearData = () => {
-    console.log("🧹 DEBUG: Data cleared.");
     stopScanning();
     setRawRssi(null);
     resetFusion();

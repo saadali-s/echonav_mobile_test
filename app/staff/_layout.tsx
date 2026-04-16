@@ -1,18 +1,12 @@
 import { Stack } from 'expo-router';
+import { Colors } from '../../constants/theme';
 
-export default function StaffLayout() {
+export default function StaffRootLayout() {
   return (
-    <Stack>
-      <Stack.Screen 
-        name="index" 
-        options={{ 
-          title: 'FLEET MANAGEMENT',
-          headerStyle: { backgroundColor: '#18181b' },
-          headerTintColor: '#ffffff',
-          headerTitleStyle: { fontWeight: '900' }, // <-- Removed letterSpacing
-          headerBackVisible: false 
-        }} 
-      />
+    <Stack screenOptions={{ headerShown: false, contentStyle: { backgroundColor: Colors.background } }}>
+      <Stack.Screen name="(tabs)" /> 
+      <Stack.Screen name="task/[id]" options={{ headerShown: true, title: 'EXECUTION', headerTitleStyle: { fontWeight: '900' } }} />
+      <Stack.Screen name="calibrate/[id]" options={{ headerShown: true, title: 'CALIBRATION', headerTitleStyle: { fontWeight: '900' } }} />
     </Stack>
   );
 }

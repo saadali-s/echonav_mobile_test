@@ -1,8 +1,10 @@
 import React from 'react';
-import { FlatList, StyleSheet, Text, View } from 'react-native';
+import { FlatList, View } from 'react-native';
 import { Venue, VenueCard } from '../../components/VenueCard';
+import { AppScreen } from '../../components/ui/AppScreen';
+import { AppText } from '../../components/ui/AppText';
+import { Spacing } from '../../constants/theme';
 
-// Temporary Mock Data featuring real-world Johannesburg public venues
 const MOCK_VENUES: Venue[] = [
   { id: '1', name: 'Rosebank Mall', campus: 'Rosebank, Johannesburg', nodes: 320, edges: 450 },
   { id: '2', name: 'Sandton City', campus: 'Sandton, Johannesburg', nodes: 512, edges: 768 },
@@ -12,53 +14,24 @@ const MOCK_VENUES: Venue[] = [
 
 export default function PublicVenuesScreen() {
   const handleVenuePress = (venue: Venue) => {
-    // In Phase E, this will trigger the Dijkstra route calculation
     console.log(`Selected Venue: ${venue.name}`);
   };
 
   return (
-    <View style={styles.container}>
+    <AppScreen>
+      <View style={{ marginBottom: Spacing.xxl }}>
+        <AppText variant="displayMd">Select Destination</AppText>
+        <AppText variant="bodySm" color="secondary">Choose a mapped venue to begin navigation.</AppText>
+      </View>
+
       <FlatList
         data={MOCK_VENUES}
+        scrollEnabled={false} // AppScreen handles scrolling
         keyExtractor={(item) => item.id}
-        contentContainerStyle={styles.listContent}
-        ListHeaderComponent={
-          <View style={styles.headerContainer}>
-            <Text style={styles.title}>Select Destination</Text>
-            <Text style={styles.subtitle}>Choose a mapped venue to begin navigation.</Text>
-          </View>
-        }
         renderItem={({ item }) => (
           <VenueCard venue={item} onPress={() => handleVenuePress(item)} />
         )}
       />
-    </View>
+    </AppScreen>
   );
 }
-
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: '#fafafa',
-  },
-  listContent: {
-    padding: 20,
-    paddingBottom: 40,
-  },
-  headerContainer: {
-    marginBottom: 24,
-  },
-  title: {
-    fontSize: 24,
-    fontWeight: '900',
-    color: '#18181b',
-    textTransform: 'uppercase',
-    letterSpacing: 0.5,
-  },
-  subtitle: {
-    fontSize: 13,
-    fontWeight: '600',
-    color: '#71717a',
-    marginTop: 4,
-  },
-});
