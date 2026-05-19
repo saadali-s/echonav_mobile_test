@@ -1,51 +1,52 @@
-import { Feather } from '@expo/vector-icons';
-import React from 'react';
-import { ScrollView, TouchableOpacity, View } from 'react-native';
-import { AppCard } from '../../../components/ui/AppCard';
+import React, { useState } from 'react';
+import { ScrollView, View } from 'react-native';
+import { AppButton } from '../../../components/ui/AppButton';
+import { AppInput } from '../../../components/ui/AppInput';
 import { AppScreen } from '../../../components/ui/AppScreen';
 import { AppText } from '../../../components/ui/AppText';
-import { Brutalist, Colors, Spacing } from '../../../constants/theme';
+import { Colors, Spacing } from '../../../constants/theme';
 
 export default function SettingsScreen() {
+  // Simple local state for the form
+  const [name, setName] = useState('jack');
+  const [email, setEmail] = useState('operator@instituition.co.za');
+
+  const handleSave = () => {
+    // Phase 5: Hook this up to Supabase auth update
+    console.log('Saving details:', { name, email });
+  };
+
   return (
     <AppScreen padded={false}>
-      <View style={{ padding: Spacing.xl, borderBottomWidth: 3, borderBottomColor: Colors.black }}>
-        <AppText variant="displaySm">Terminal Settings</AppText>
+      <View style={{ padding: Spacing.xl, borderBottomWidth: 3, borderBottomColor: Colors.black, backgroundColor: Colors.white }}>
+        <AppText variant="displaySm">Settings</AppText>
       </View>
 
       <ScrollView contentContainerStyle={{ padding: Spacing.xl, gap: Spacing.lg }}>
-        <AppText variant="label" color="muted">Hardware & Local Data</AppText>
-        <SettingItem icon="bluetooth" label="BLE Radio Calibration" value="Active (-65dBm)" />
-        <SettingItem icon="database" label="Clear Offline Map Cache" value="14.2 MB" />
-        <SettingItem icon="refresh-cw" label="Force Full Sync" />
-
-        <View style={{ height: 2, backgroundColor: Colors.border, marginVertical: Spacing.md }} />
-
-        <AppText variant="label" color="muted">Account Authority</AppText>
-        <SettingItem icon="user" label="Operator Profile" value="Thabo Nkosi" />
-        <SettingItem icon="shield" label="Administrative Key" value="**** 4022" />
+        <AppText variant="label" color="muted">Profile Details</AppText>
         
-        <TouchableOpacity style={{ marginTop: Spacing.xxl }}>
-           <AppCard variant="danger" style={{ alignItems: 'center' }}>
-              <AppText variant="titleMd" color="inverse">REVOKE LOCAL AUTHORIZATION</AppText>
-           </AppCard>
-        </TouchableOpacity>
+        <View style={{ gap: Spacing.sm }}>
+          <AppInput 
+            label="Full Name" 
+            value={name} 
+            onChangeText={setName} 
+            placeholder="Enter your full name" 
+          />
+          <AppInput 
+            label="Email Address" 
+            value={email} 
+            onChangeText={setEmail} 
+            keyboardType="email-address" 
+            autoCapitalize="none" 
+            placeholder="name@domain.com"
+          />
+          
+          <AppButton onPress={handleSave} style={{ marginTop: Spacing.md }}>
+            SAVE DETAILS
+          </AppButton>
+        </View>
+
       </ScrollView>
     </AppScreen>
-  );
-}
-
-function SettingItem({ icon, label, value }: any) {
-  return (
-    <TouchableOpacity style={[Brutalist.card, { flexDirection: 'row', alignItems: 'center', padding: Spacing.lg, borderBottomWidth: 4 }]}>
-      <View style={{ width: 40, height: 40, borderRadius: 8, backgroundColor: Colors.borderLight, justifyContent: 'center', alignItems: 'center', borderWidth: 1.5, borderColor: Colors.black }}>
-        <Feather name={icon} size={18} color={Colors.black} />
-      </View>
-      <View style={{ flex: 1, marginLeft: Spacing.md }}>
-        <AppText variant="titleSm">{label}</AppText>
-        {value && <AppText variant="caption" color="secondary">{value}</AppText>}
-      </View>
-      <Feather name="chevron-right" size={20} color={Colors.textMuted} />
-    </TouchableOpacity>
   );
 }

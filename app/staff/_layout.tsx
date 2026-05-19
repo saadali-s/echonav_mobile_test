@@ -1,12 +1,20 @@
 import { Stack } from 'expo-router';
-import { Colors } from '../../constants/theme';
+import React from 'react';
+import { Provider as PaperProvider } from 'react-native-paper';
+import { AuthProvider } from '../../context/AuthContext';
 
-export default function StaffRootLayout() {
+export default function RootLayout() {
   return (
-    <Stack screenOptions={{ headerShown: false, contentStyle: { backgroundColor: Colors.background } }}>
-      <Stack.Screen name="(tabs)" /> 
-      <Stack.Screen name="task/[id]" options={{ headerShown: true, title: 'EXECUTION', headerTitleStyle: { fontWeight: '900' } }} />
-      <Stack.Screen name="calibrate/[id]" options={{ headerShown: true, title: 'CALIBRATION', headerTitleStyle: { fontWeight: '900' } }} />
-    </Stack>
+    <AuthProvider>
+      <PaperProvider>
+        <Stack screenOptions={{ headerShown: false }}>
+          <Stack.Screen name="index" />
+          <Stack.Screen name="signup" />
+          <Stack.Screen name="(user)" />
+          <Stack.Screen name="staff" />
+          <Stack.Screen name="navigate/index" />
+        </Stack>
+      </PaperProvider>
+    </AuthProvider>
   );
 }

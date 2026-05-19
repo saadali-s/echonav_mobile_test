@@ -11,7 +11,6 @@ export function StaffHeader({ name, onLogout }: { name: string; onLogout: () => 
     <View style={styles.container}>
       <View style={styles.topRow}>
         <View>
-          <AppText variant="label" color="muted" style={styles.statusLabel}>SYSTEM_ONLINE</AppText>
           <AppText variant="displayMd" style={styles.stylishTitle}>EchoFleet</AppText>
         </View>
         <View style={styles.actions}>

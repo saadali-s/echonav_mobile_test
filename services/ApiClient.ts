@@ -1,28 +1,35 @@
-// Replace with your computer's actual local IP address running the Next.js server
-// e.g., "http://192.168.1.100:3000/api"
-const BASE_URL = "http://YOUR_LOCAL_IP:3000/api"; 
+import * as SecureStore from 'expo-secure-store';
+
+// CRITICAL: Ensure this matches your computer's IPv4 address and Spring Boot port
+const BASE_URL = "http://192.168.3.2:8081/api"; 
+const TOKEN_KEY = 'echonav_mobile_jwt';
 
 export class ApiClient {
-  // We will dynamically inject the JWT token here in Subtask D.2
-  static token: string | null = null;
+  
+  static async setToken(jwt: string) {
+    await SecureStore.setItemAsync(TOKEN_KEY, jwt);
+  }
 
-  static setToken(jwt: string) {
-    this.token = jwt;
+  static async clearToken() {
+    await SecureStore.deleteItemAsync(TOKEN_KEY);
+  }
+
+  static async getToken(): Promise<string | null> {
+    return await SecureStore.getItemAsync(TOKEN_KEY);
   }
 
   private static async request<T>(endpoint: string, options: RequestInit = {}): Promise<T> {
     const url = `${BASE_URL}${endpoint}`;
     
-    // Explicitly cast to a Record so TypeScript allows dynamic key assignment
     const headers: Record<string, string> = {
       'Content-Type': 'application/json',
       'Accept': 'application/json',
       ...(options.headers as Record<string, string> || {}),
     };
 
-    // Automatically attach the Authorization header if we have a token
-    if (this.token) {
-      headers['Authorization'] = `Bearer ${this.token}`;
+    const token = await this.getToken();
+    if (token) {
+      headers['Authorization'] = `Bearer ${token}`;
     }
 
     try {
@@ -32,7 +39,7 @@ export class ApiClient {
       const data = isJson ? await response.json() : await response.text();
 
       if (!response.ok) {
-        throw new Error(data.error || `HTTP Error ${response.status}`);
+        throw new Error(data.message || data.error || `HTTP Error ${response.status}`);
       }
 
       return data as T;

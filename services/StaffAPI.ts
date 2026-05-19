@@ -6,8 +6,9 @@ export class StaffAPI {
     return ApiClient.post<any>('/staff/invite', { email, role });
   }
 
-  // Mobile: Staff activating their invite code
-  static async activateStaff(inviteCode: string, password: string, displayName: string) {
-    return ApiClient.post<any>('/staff/activate', { inviteCode, password, displayName });
+  // THE FIX: Re-mapped to the Auth subsystem and removed redundant payload fields 
+  // (Backend Activation only requires the token in the URL and the password in the body)
+  static async activateStaff(inviteCode: string, password: string) {
+    return ApiClient.post<any>(`/auth/activate/${inviteCode}`, { password });
   }
 }

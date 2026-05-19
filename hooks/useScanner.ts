@@ -1,11 +1,12 @@
 import { BEACON_CONFIG } from '@/constants/Config';
 import { useRef, useState } from 'react';
 import { PermissionsAndroid, Platform } from 'react-native';
-import { BleManager } from 'react-native-ble-plx';
+import { BleManager, Device } from 'react-native-ble-plx';
 import { useFusionDistance } from './useFusionDistance';
 
 export const useScanner = () => {
   const [rawRssi, setRawRssi] = useState<number | null>(null);
+  const [scannedDevice, setScannedDevice] = useState<Device | null>(null); // <-- NEW: Captures full hardware profile
   const [isScanning, setIsScanning] = useState(false);
   const managerRef = useRef<BleManager | null>(null);
 
@@ -13,7 +14,6 @@ export const useScanner = () => {
 
   const requestBluetoothPermissions = async () => {
     if (Platform.OS === 'android') {
-      // Android 12+ requires explicit scan/connect permissions
       if (Platform.Version >= 31) {
         const granted = await PermissionsAndroid.requestMultiple([
           PermissionsAndroid.PERMISSIONS.BLUETOOTH_SCAN,
@@ -22,7 +22,6 @@ export const useScanner = () => {
         ]);
         return granted[PermissionsAndroid.PERMISSIONS.BLUETOOTH_SCAN] === PermissionsAndroid.RESULTS.GRANTED;
       } else {
-        // Older Android just needs location
         const granted = await PermissionsAndroid.request(
           PermissionsAndroid.PERMISSIONS.ACCESS_FINE_LOCATION
         );
@@ -33,13 +32,8 @@ export const useScanner = () => {
   };
 
   const startScanning = async () => {
-    console.log("DEBUG: Requesting permissions...");
-    
     const hasPermission = await requestBluetoothPermissions();
-    if (!hasPermission) {
-      console.error("Bluetooth permissions denied by user.");
-      return;
-    }
+    if (!hasPermission) return;
 
     try {
       if (!managerRef.current) managerRef.current = new BleManager();
@@ -57,8 +51,8 @@ export const useScanner = () => {
             return;
           }
           if (device && device.rssi) {
-            console.log(`TARGET BEACON PING! RSSI: ${device.rssi}`);
             setRawRssi(device.rssi);
+            setScannedDevice(device); // <-- NEW: Store the device so we can extract its MAC/UUID later
           }
         }
       );
@@ -69,7 +63,6 @@ export const useScanner = () => {
   };
 
   const stopScanning = () => {
-    console.log("DEBUG: Navigation stopped.");
     if (managerRef.current) {
       managerRef.current.stopDeviceScan();
     }
@@ -79,8 +72,9 @@ export const useScanner = () => {
   const clearData = () => {
     stopScanning();
     setRawRssi(null);
+    setScannedDevice(null);
     resetFusion();
   };
 
-  return { isScanning, rssi: rawRssi, distance, metrics, startScanning, stopScanning, clearData };
+  return { isScanning, rssi: rawRssi, scannedDevice, distance, metrics, startScanning, stopScanning, clearData };
 };

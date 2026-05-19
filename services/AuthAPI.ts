@@ -1,23 +1,30 @@
 import { ApiClient } from './ApiClient';
 
 export class AuthAPI {
-  // Mobile: Staff Login
   static async loginStaff(email: string, password: string) {
     return ApiClient.post<any>('/auth/login', { email, password });
   }
 
-  // Mobile: Visually Impaired Student pairing
-  static async pairDevice(pin: string, appInstallationId: string, deviceModel: string) {
-    return ApiClient.post<any>('/auth/device/pair', { pin, appInstallationId, deviceModel });
+  static async pairDevice(email: string, pin: string) {
+    return ApiClient.post<any>('/auth/pair', { email, pin });
   }
 
-  // Admin: PsyCaD Desk generating a PIN
-  static async generatePairingPin() {
-    return ApiClient.post<any>('/auth/device/generate-pin', {});
+  static async mobileSignup(firstName: string, lastName: string, email: string, password: string) {
+    return ApiClient.post<any>('/auth/mobile-signup', { firstName, lastName, email, password });
   }
 
-  // Admin: Initial master tenant setup
-  static async registerOrganization(payload: { orgName: string, slug: string, adminEmail: string, adminPassword: string, adminName: string }) {
-    return ApiClient.post<any>('/organizations/register', payload);
+  static async activateInvite(token: string, password: string) {
+    return ApiClient.post<any>(`/auth/activate/${token}`, { password });
+  }
+
+  // THE FIX: Ensure local state clears regardless of server response
+  static async logout() {
+    try {
+      await ApiClient.post<any>('/auth/logout', {});
+    } catch (error) {
+      console.warn("Backend logout failed or not supported, proceeding to clear local token.");
+    } finally {
+      await ApiClient.clearToken();
+    }
   }
 }

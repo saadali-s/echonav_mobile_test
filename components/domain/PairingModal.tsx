@@ -1,5 +1,5 @@
 import { Feather } from '@expo/vector-icons';
-import React from 'react';
+import React, { useState } from 'react';
 import { KeyboardAvoidingView, Modal, Platform, StyleSheet, TouchableOpacity, View } from 'react-native';
 import { Colors, Spacing } from '../../constants/theme';
 import { AppButton } from '../ui/AppButton';
@@ -8,36 +8,48 @@ import { AppText } from '../ui/AppText';
 
 interface PairingModalProps {
   visible: boolean;
-  pin: string;
-  onPinChange: (val: string) => void;
   onClose: () => void;
-  onAuthenticate: () => void;
+  onAuthenticate: (email: string, pin: string) => void;
 }
 
-export function PairingModal({ visible, pin, onPinChange, onClose, onAuthenticate }: PairingModalProps) {
+export function PairingModal({ visible, onClose, onAuthenticate }: PairingModalProps) {
+  const [email, setEmail] = useState('');
+  const [pin, setPin] = useState('');
+
   return (
     <Modal visible={visible} animationType="slide" transparent>
       <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={styles.overlay}>
         <View style={styles.card}>
           <View style={styles.header}>
-            <AppText variant="titleMd">Visually Impaired Device Provisioning</AppText>
+            <AppText variant="titleMd">Accessibility Setup</AppText>
             <TouchableOpacity onPress={onClose}><Feather name="x" size={24} color={Colors.black} /></TouchableOpacity>
           </View>
           <AppText variant="bodySm" color="secondary" style={styles.subtitle}>
-            Enter the 6-digit TTL PIN from the Instituition Admin Accessibility Desk.
+            Enter your registered email and the 6-digit TTL PIN from the Institution Accessibility Desk.
           </AppText>
+          
+          <AppInput
+            label="Registered Email"
+            value={email}
+            onChangeText={setEmail}
+            placeholder="name@example.com"
+            keyboardType="email-address"
+            autoCapitalize="none"
+          />
+
           <AppInput
             label="Secure PIN"
             value={pin}
-            onChangeText={onPinChange}
-            placeholder="••••••"
+            onChangeText={setPin}
+            placeholder="•••••"
             keyboardType="number-pad"
             maxLength={6}
             style={styles.pinInput}
           />
+
           <AppButton 
-            onPress={onAuthenticate} 
-            disabled={pin.length !== 6}
+            onPress={() => onAuthenticate(email, pin)} 
+            disabled={pin.length !== 5 || !email.includes('@')}
             variant="primary"
           >
             AUTHENTICATE & BIND

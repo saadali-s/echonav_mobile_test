@@ -1,27 +1,52 @@
 import { useRouter } from 'expo-router';
-import React, { useState } from 'react';
-import { FlatList, ScrollView, TouchableOpacity, View } from 'react-native';
+import React, { useEffect, useState } from 'react';
+import { ActivityIndicator, Alert, FlatList, ScrollView, TouchableOpacity, View } from 'react-native';
 import { Task, TaskCard } from '../../../components/TaskCard';
 import { AppScreen } from '../../../components/ui/AppScreen';
 import { AppText } from '../../../components/ui/AppText';
 import { SearchInput } from '../../../components/ui/SearchInput';
 import { Colors, Spacing } from '../../../constants/theme';
-
-const MOCK_DATA: Task[] = [
-  { id: '1', title: 'Entrance Beacon', location: 'Gate 1', status: 'PENDING' },
-  { id: '2', title: 'Library Node 4', location: 'Floor 2', status: 'IN_PROGRESS' },
-  { id: '3', title: 'Cafe Beacon', location: 'Student Center', status: 'COMPLETED' },
-  { id: '4', title: 'Lab 202 Cal', location: 'Science Block', status: 'PENDING' },
-];
+import { useAuth } from '../../../context/AuthContext';
+import { FleetAPI } from '../../../services/FleetAPI';
 
 const FILTERS: (Task['status'] | 'ALL')[] = ['ALL', 'PENDING', 'IN_PROGRESS', 'COMPLETED'];
 
 export default function AllTasksScreen() {
   const router = useRouter();
+  const { userId } = useAuth(); // Extract staff ID from global context
+  
   const [search, setSearch] = useState('');
   const [activeFilter, setActiveFilter] = useState<'ALL' | Task['status']>('ALL');
+  const [tasks, setTasks] = useState<Task[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
 
-  const filteredTasks = MOCK_DATA.filter(task => {
+  // THE FIX: Fetch live task queue mapped to this specific technician
+  useEffect(() => {
+    const fetchTasks = async () => {
+      if (!userId) return;
+      try {
+        setIsLoading(true);
+        const data = await FleetAPI.getStaffTasks(userId);
+        
+        const mappedTasks: Task[] = data.map((t: any) => ({
+          id: String(t.id),
+          title: t.status === 'VERIFIED' ? 'Calibration Audit' : 'Deploy Beacon',
+          location: `Map Node #${t.nodeId}`,
+          status: t.status === 'VERIFIED' ? 'COMPLETED' : t.status === 'TO_DO' ? 'PENDING' : 'IN_PROGRESS'
+        }));
+        
+        setTasks(mappedTasks);
+      } catch (error: any) {
+        Alert.alert("Sync Error", error.message || "Failed to load deployment queue.");
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    fetchTasks();
+  }, [userId]);
+
+  const filteredTasks = tasks.filter(task => {
     const matchesSearch = task.title.toLowerCase().includes(search.toLowerCase()) || 
                          task.location.toLowerCase().includes(search.toLowerCase());
     const matchesFilter = activeFilter === 'ALL' || task.status === activeFilter;
@@ -51,22 +76,29 @@ export default function AllTasksScreen() {
         </ScrollView>
       </View>
 
-      <FlatList
-        data={filteredTasks}
-        keyExtractor={(item) => item.id}
-        contentContainerStyle={{ padding: Spacing.xl, paddingBottom: 150 }}
-        renderItem={({ item }) => (
-          <TaskCard 
-            task={item} 
-            onPress={() => router.push(`/staff/task/${item.id}` as any)} 
-          />
-        )}
-        ListEmptyComponent={() => (
-          <View style={{ alignItems: 'center', marginTop: 60 }}>
-            <AppText variant="body" color="muted">No matching deployments found.</AppText>
-          </View>
-        )}
-      />
+      {isLoading ? (
+        <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
+          <ActivityIndicator size="large" color={Colors.black} />
+          <AppText variant="caption" color="muted" style={{ marginTop: Spacing.md }}>SYNCING QUEUE...</AppText>
+        </View>
+      ) : (
+        <FlatList
+          data={filteredTasks}
+          keyExtractor={(item) => item.id}
+          contentContainerStyle={{ padding: Spacing.xl, paddingBottom: 150 }}
+          renderItem={({ item }) => (
+            <TaskCard 
+              task={item} 
+              onPress={() => router.push(`/staff/task/${item.id}` as any)} 
+            />
+          )}
+          ListEmptyComponent={() => (
+            <View style={{ alignItems: 'center', marginTop: 60 }}>
+              <AppText variant="body" color="muted">No matching deployments found.</AppText>
+            </View>
+          )}
+        />
+      )}
     </AppScreen>
   );
 }

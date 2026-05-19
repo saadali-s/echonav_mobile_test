@@ -1,34 +1,28 @@
 import { ApiClient } from './ApiClient';
 
 export class FleetAPI {
-  // Admin: Top-row dashboard stats
-  static async getOverview(organizationId: string) {
-    return ApiClient.get<any>(`/fleet/overview?organizationId=${organizationId}`);
+  // 1. THE FIX: Correctly maps to path variables matching Backend Phase 1
+  static async getTasksByOrgId(orgId: string) {
+    return ApiClient.get<any[]>(`/fleet/tasks/organisation/${orgId}`);
   }
 
-  // Mobile: Populating the technician's Kanban board
+  // 2. THE FIX: Correctly maps to path variables matching Backend Phase 1
   static async getStaffTasks(staffId: string) {
-    return ApiClient.get<any[]>(`/fleet/tasks?staffId=${staffId}`);
+    return ApiClient.get<any[]>(`/fleet/tasks/staff/${staffId}`);
   }
 
-  // Admin: Bulk assigning nodes to a technician
-  static async createDeploymentTasks(payload: { organizationId: string, mapId: string, nodeIds: string[], staffId: string }) {
-    return ApiClient.post<any>('/fleet/tasks', payload);
-  }
-
-  // Mobile: Phase C.2 - Scanning and locking the MAC address
-  static async bindBeacon(taskId: string, payload: { organizationId: string, nodeId: string, hardwareUuid: string, major: number, minor: number }) {
-    return ApiClient.put<any>(`/fleet/tasks/${taskId}/action`, { 
-      action: 'BIND', 
-      ...payload 
+  // 3. THE FIX: Realigned payload and routing contract to target POST /api/fleet/beacons/link
+  static async linkBeacon(nodeId: string, uuid: string, major: number, minor: number) {
+    return ApiClient.post<any>('/fleet/beacons/link', { 
+      nodeId: parseInt(nodeId), 
+      uuid, 
+      major, 
+      minor 
     });
   }
 
-  // Mobile: Phase C.3 - Saving the 1-meter RSSI baseline
-  static async calibrateBeacon(taskId: string, payload: { beaconId: string, baselineRssi: number }) {
-    return ApiClient.put<any>(`/fleet/tasks/${taskId}/action`, { 
-      action: 'CALIBRATE', 
-      ...payload 
-    });
+  // 4. THE FIX: Cleaned up dead actions, maps status directly to PUT endpoint
+  static async updateTaskStatus(taskId: string, status: string) {
+    return ApiClient.put<any>(`/fleet/tasks/${taskId}`, { status });
   }
 }

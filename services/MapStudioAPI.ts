@@ -1,23 +1,29 @@
 import { ApiClient } from './ApiClient';
 
 export class MapStudioAPI {
-  // Shared: Gets buildings (Mobile uses ?public=true)
-  static async getBuildings(isPublic: boolean = false) {
-    return ApiClient.get<any[]>(`/buildings?public=${isPublic}`);
+  // Shared: Gets private buildings for an organization
+  static async getBuildings(orgId: string) {
+    return ApiClient.get<any[]>(`/mapstudio/organisations/${orgId}/buildings`);
+  }
+
+  // --- ISSUE 1 FIX: New Public Fetcher ---
+  static async getPublicBuildings() {
+    return ApiClient.get<any[]>('/mapstudio/buildings/public');
+  }
+
+  // --- THE RESTORED MISSING METHOD ---
+  // Shared: Gets specific floor plans for a building
+  static async getFloorPlans(buildingId: string) {
+    return ApiClient.get<any[]>(`/mapstudio/buildings/${buildingId}/floorplans`);
   }
 
   // Admin: Setting the physical scale ruler
   static async saveMapScale(mapId: string, scaleMetersPerPixel: number) {
-    return ApiClient.post<any>(`/maps/${mapId}/scale`, { scaleMetersPerPixel });
+    return ApiClient.put<any>(`/mapstudio/floorplans/${mapId}`, { scale: scaleMetersPerPixel });
   }
 
   // Admin: Saving the Figma-style nodes/edges
   static async saveGraph(mapId: string, payload: { nodes: any[], edges: any[] }) {
-    return ApiClient.put<any>(`/maps/${mapId}/graph`, payload);
-  }
-
-  // Admin: Converting the graph to an .echomap bundle
-  static async publishMap(mapId: string) {
-    return ApiClient.post<any>(`/maps/${mapId}/publish`, {});
+    return ApiClient.put<any>(`/mapstudio/floorplans/${mapId}/graph`, payload);
   }
 }

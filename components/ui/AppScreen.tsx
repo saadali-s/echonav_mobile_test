@@ -7,7 +7,7 @@ interface AppScreenProps {
   style?: ViewStyle;
   padded?: boolean;
   scrollable?: boolean;
-  keyboardAvoiding?: boolean; // Added this property
+  keyboardAvoiding?: boolean;
   dark?: boolean;
   centered?: boolean;
 }
@@ -17,7 +17,7 @@ export function AppScreen({
   style,
   padded = true,
   scrollable = true,
-  keyboardAvoiding = false, // Default value
+  keyboardAvoiding = false,
   dark = false,
   centered = false,
 }: AppScreenProps) {
@@ -53,6 +53,8 @@ export function AppScreen({
       <KeyboardAvoidingView
         style={[styles.base, dark && styles.dark]}
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+        // Ensures a small buffer above the keyboard so the input isn't flush against it
+        keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 20} 
       >
         {content}
       </KeyboardAvoidingView>
@@ -67,5 +69,7 @@ const styles = StyleSheet.create({
   dark: { backgroundColor: Colors.black },
   padded: { paddingHorizontal: Spacing.xl, paddingVertical: Spacing.lg },
   centered: { justifyContent: 'center', alignItems: 'center' },
-  scrollContent: { flexGrow: 1, paddingBottom: Spacing.section },
+  // flexGrow is critical here; it tells the ScrollView to fill the available space, 
+  // allowing the KeyboardAvoidingView to compress it properly.
+  scrollContent: { flexGrow: 1, paddingBottom: Spacing.section }, 
 });

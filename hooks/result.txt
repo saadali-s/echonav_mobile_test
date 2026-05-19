@@ -1,0 +1,285 @@
+Path: C:\Users\User\Downloads\startups\EchoNav\project\echonav-mobile\echonav-mobile\hooks\result.txt 
+Path: C:\Users\User\Downloads\startups\EchoNav\project\echonav-mobile\echonav-mobile\hooks\result.txt 
+
+Path: C:\Users\User\Downloads\startups\EchoNav\project\echonav-mobile\echonav-mobile\hooks\useCompass.ts 
+import { Magnetometer } from 'expo-sensors';
+import { useEffect, useState } from 'react';
+
+export const useCompass = () => {
+  const [heading, setHeading] = useState(0);
+
+  useEffect(() => {
+    let subscription: any;
+
+    const startCompass = async () => {
+      const isAvailable = await Magnetometer.isAvailableAsync();
+      if (isAvailable) {
+        // Slowed down from 100 to 500 to stop freezing the UI!
+        Magnetometer.setUpdateInterval(500); 
+        subscription = Magnetometer.addListener((data) => {
+          let angle = Math.atan2(data.y, data.x) * (180 / Math.PI);
+          if (angle < 0) angle += 360;
+          setHeading(Math.round(angle));
+        });
+      }
+    };
+
+    startCompass();
+
+    return () => {
+      if (subscription) subscription.remove();
+    };
+  }, []);
+
+  return { heading };
+};
+Path: C:\Users\User\Downloads\startups\EchoNav\project\echonav-mobile\echonav-mobile\hooks\useFusionDistance.ts 
+import { useCallback, useEffect, useRef, useState } from 'react';
+import { usePDR } from './usePDR';
+import { useRSSIKalman } from './useRSSIKalman';
+// import * as Speech from 'expo-speech'; // <-- Temporarily disabled for modular Audio Engine later
+
+const TX_POWER_1M = -65; 
+const PATH_LOSS_EXP = 3.0; 
+const PROXIMITY_TRIGGER = 2.0; 
+const ABSOLUTE_OVERRIDE_RSSI = -73;
+
+export const useFusionDistance = (rawRSSI: number | null) => {
+  const { filter: kalmanFilter, reset: resetKalman } = useRSSIKalman();
+  const { steps } = usePDR();
+
+  const [distance, setFusedDistance] = useState<number | null>(null);
+  const [metrics, setMetrics] = useState({ rawRSSI: 0, smoothRSSI: 0, rawDist: 0 });
+  
+  const isNearRef = useRef<boolean>(false);
+  const lastAnnouncementTime = useRef<number>(0);
+
+  const calculateDistance = (rssi: number) => {
+    return Math.pow(10, (TX_POWER_1M - rssi) / (10 * PATH_LOSS_EXP));
+  };
+
+  useEffect(() => {
+    if (rawRSSI === null) return;
+
+    let finalDistance = 0;
+    let smoothRSSI = kalmanFilter(rawRSSI);
+    const rawDistanceImplied = calculateDistance(rawRSSI);
+
+    if (rawRSSI >= ABSOLUTE_OVERRIDE_RSSI) {
+        finalDistance = 0.5;
+        smoothRSSI = rawRSSI; 
+    } else {
+        const rssiDist = calculateDistance(smoothRSSI);
+        finalDistance = Math.max(0, rssiDist);
+    }
+
+    setMetrics({
+        rawRSSI: rawRSSI,
+        smoothRSSI: parseFloat(smoothRSSI.toFixed(1)),
+        rawDist: parseFloat(rawDistanceImplied.toFixed(2))
+    });
+
+    console.log(` FUSION | Raw: ${rawRSSI} | Smooth: ${smoothRSSI.toFixed(1)} | Final: ${finalDistance.toFixed(2)}m`);
+
+    const now = Date.now();
+    if (finalDistance <= PROXIMITY_TRIGGER && !isNearRef.current) {
+        if (now - lastAnnouncementTime.current > 8000) {
+            isNearRef.current = true;
+            lastAnnouncementTime.current = now;
+            // TODO (Phase E): Trigger the dynamic useAudioEngine here instead of hardcoded TTS
+            console.log("AUDIO TRIGGER: Landmark reached. You are at the destination.");
+        }
+    } else if (finalDistance > PROXIMITY_TRIGGER + 1.5) {
+        isNearRef.current = false;
+    }
+
+    setFusedDistance(finalDistance);
+  }, [rawRSSI, steps, kalmanFilter]); 
+
+  const resetFusion = useCallback(() => {
+    resetKalman();
+    setFusedDistance(null);
+    isNearRef.current = false;
+    lastAnnouncementTime.current = 0;
+  }, [resetKalman]);
+
+  return { distance, metrics, resetFusion };
+};
+Path: C:\Users\User\Downloads\startups\EchoNav\project\echonav-mobile\echonav-mobile\hooks\usePDR.ts 
+import { Pedometer } from 'expo-sensors';
+import { useEffect, useRef, useState } from 'react';
+
+export const usePDR = () => {
+  const [steps, setSteps] = useState(0);
+  
+  // Let TypeScript figure out the subscription type automatically
+  const subscription = useRef<ReturnType<typeof Pedometer.watchStepCount> | null>(null);
+
+  useEffect(() => {
+    let isMounted = true;
+
+    const startPedometer = async () => {
+      // Tap directly into the native hardware feed
+      const isAvailable = await Pedometer.isAvailableAsync();
+      
+      if (isAvailable && isMounted) {
+        subscription.current = Pedometer.watchStepCount(result => {
+          setSteps(result.steps);
+        });
+      } else {
+        console.log(" Native pedometer chip not found or permission denied.");
+      }
+    };
+
+    startPedometer();
+
+    return () => {
+      isMounted = false;
+      if (subscription.current) {
+        subscription.current.remove();
+      }
+    };
+  }, []);
+
+  return { steps };
+};
+Path: C:\Users\User\Downloads\startups\EchoNav\project\echonav-mobile\echonav-mobile\hooks\useRSSIKalman.ts 
+import { useCallback, useRef } from 'react';
+
+// The "Speed" of the filter.
+const PROCESS_NOISE = 0.8; 
+
+// How much we trust a signal that is GETTING STRONGER (Approaching). 
+// 0.01 is near-instant trust, eliminating the "climb" lag.
+const MEASUREMENT_NOISE_APPROACH = 0.01; 
+
+// How much we trust a signal that is GETTING WEAKER (Departing).
+// 5.0 is extreme skepticism, helping ignore sudden drops/shadows.
+const MEASUREMENT_NOISE_DEPART = 5.0;    
+
+export const useRSSIKalman = () => {
+  const x = useRef<number>(0); 
+  const p = useRef<number>(0); 
+  const initialized = useRef<boolean>(false);
+
+  const filter = useCallback((rssi: number): number => {
+    if (!initialized.current) {
+      x.current = rssi;
+      p.current = 1.0;
+      initialized.current = true;
+      return rssi;
+    }
+
+    //  SNAPPING LOGIC: If the signal jumps by more than 12dBm instantly, 
+    // it's likely a rapid approach. Snap the filter to the new value immediately.
+    if (rssi - x.current > 12) {
+        x.current = rssi;
+        p.current = 1.0;
+        return rssi;
+    }
+
+    const R = rssi > x.current ? MEASUREMENT_NOISE_APPROACH : MEASUREMENT_NOISE_DEPART;
+
+    const p_pred = p.current + PROCESS_NOISE;
+    const K = p_pred / (p_pred + R);
+    x.current = x.current + K * (rssi - x.current);
+    p.current = (1 - K) * p_pred;
+
+    return x.current;
+  }, []);
+
+  const reset = useCallback(() => {
+    x.current = 0;
+    p.current = 0;
+    initialized.current = false;
+  }, []);
+
+  return { filter, reset };
+};
+Path: C:\Users\User\Downloads\startups\EchoNav\project\echonav-mobile\echonav-mobile\hooks\useScanner.ts 
+import { BEACON_CONFIG } from '@/constants/Config';
+import { useRef, useState } from 'react';
+import { PermissionsAndroid, Platform } from 'react-native';
+import { BleManager } from 'react-native-ble-plx';
+import { useFusionDistance } from './useFusionDistance';
+
+export const useScanner = () => {
+  const [rawRssi, setRawRssi] = useState<number | null>(null);
+  const [isScanning, setIsScanning] = useState(false);
+  const managerRef = useRef<BleManager | null>(null);
+
+  const { distance, metrics, resetFusion } = useFusionDistance(rawRssi);
+
+  const requestBluetoothPermissions = async () => {
+    if (Platform.OS === 'android') {
+      // Android 12+ requires explicit scan/connect permissions
+      if (Platform.Version >= 31) {
+        const granted = await PermissionsAndroid.requestMultiple([
+          PermissionsAndroid.PERMISSIONS.BLUETOOTH_SCAN,
+          PermissionsAndroid.PERMISSIONS.BLUETOOTH_CONNECT,
+          PermissionsAndroid.PERMISSIONS.ACCESS_FINE_LOCATION,
+        ]);
+        return granted[PermissionsAndroid.PERMISSIONS.BLUETOOTH_SCAN] === PermissionsAndroid.RESULTS.GRANTED;
+      } else {
+        // Older Android just needs location
+        const granted = await PermissionsAndroid.request(
+          PermissionsAndroid.PERMISSIONS.ACCESS_FINE_LOCATION
+        );
+        return granted === PermissionsAndroid.RESULTS.GRANTED;
+      }
+    }
+    return true;
+  };
+
+  const startScanning = async () => {
+    console.log("DEBUG: Requesting permissions...");
+    
+    const hasPermission = await requestBluetoothPermissions();
+    if (!hasPermission) {
+      console.error("Bluetooth permissions denied by user.");
+      return;
+    }
+
+    try {
+      if (!managerRef.current) managerRef.current = new BleManager();
+      setIsScanning(true);
+      
+      const targetUUID = BEACON_CONFIG.UUID.toLowerCase();
+
+      managerRef.current.startDeviceScan(
+        [targetUUID], 
+        { allowDuplicates: true }, 
+        (error, device) => {
+          if (error) {
+            console.error("Scan error:", error.message);
+            setIsScanning(false);
+            return;
+          }
+          if (device && device.rssi) {
+            console.log(`TARGET BEACON PING! RSSI: ${device.rssi}`);
+            setRawRssi(device.rssi);
+          }
+        }
+      );
+    } catch (err: any) {
+      console.error("FATAL CRASH:", err);
+      setIsScanning(false);
+    }
+  };
+
+  const stopScanning = () => {
+    console.log("DEBUG: Navigation stopped.");
+    if (managerRef.current) {
+      managerRef.current.stopDeviceScan();
+    }
+    setIsScanning(false);
+  };
+
+  const clearData = () => {
+    stopScanning();
+    setRawRssi(null);
+    resetFusion();
+  };
+
+  return { isScanning, rssi: rawRssi, distance, metrics, startScanning, stopScanning, clearData };
+};
