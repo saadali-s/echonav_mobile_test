@@ -4,10 +4,11 @@ import { AppScreen } from '@/components/ui/AppScreen';
 import { AppText } from '@/components/ui/AppText';
 import { Colors, Spacing } from '@/constants/theme';
 import { useScanner } from '@/hooks/useScanner';
+import { FleetAPI } from '@/services/FleetAPI'; // <-- THE FIX: Import API
 import { Feather } from '@expo/vector-icons';
 import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
 import React, { useEffect, useRef, useState } from 'react';
-import { Vibration, View } from 'react-native';
+import { Alert, Vibration, View } from 'react-native'; // <-- THE FIX: Added Alert
 
 export default function CalibrationScreen() {
   const { id } = useLocalSearchParams();
@@ -17,6 +18,7 @@ export default function CalibrationScreen() {
   const [isCalibrating, setIsCalibrating] = useState(false);
   const [progress, setProgress] = useState(0);
   const [baselineRssi, setBaselineRssi] = useState<number | null>(null);
+  const [isSaving, setIsSaving] = useState(false); // <-- THE FIX: Loading state for the commit
   
   const samplesRef = useRef<number[]>([]);
 
@@ -57,10 +59,24 @@ export default function CalibrationScreen() {
     }, 100);
   };
 
-  const handleComplete = () => {
-    // Logic for database commit happens here in Phase D
-    console.log(`Finalizing Task ${id} with Baseline: ${baselineRssi}`);
-    router.replace('/staff' as any);
+  // THE FIX: Asynchronously ship the baseline to the database
+  const handleComplete = async () => {
+    if (!baselineRssi) return;
+
+    try {
+      setIsSaving(true);
+      console.log(`[Calibration] Finalizing Task ${id} with Baseline: ${baselineRssi}`);
+      
+      await FleetAPI.updateTaskStatus(id as string, 'VERIFIED', baselineRssi);
+      
+      Alert.alert("Success", "Beacon calibrated and deployed successfully.");
+      router.replace('/staff/(tabs)' as any);
+    } catch (error: any) {
+      console.error("[Calibration] Commit failed", error);
+      Alert.alert("Commit Error", error.message || "Failed to save the baseline to the database.");
+    } finally {
+      setIsSaving(false);
+    }
   };
 
   return (
@@ -124,7 +140,12 @@ export default function CalibrationScreen() {
               </AppText>
             </View>
             
-            <AppButton variant="primary" onPress={handleComplete}>
+            <AppButton 
+              variant="primary" 
+              onPress={handleComplete}
+              loading={isSaving}
+              disabled={isSaving}
+            >
               SAVE & COMPLETE TASK
             </AppButton>
           </View>

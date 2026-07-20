@@ -3,34 +3,29 @@ import React, { useEffect } from 'react';
 import { Provider as PaperProvider } from 'react-native-paper';
 import { AuthProvider, useAuth } from '../context/AuthContext';
 
-// THE FIX: Inner component that can safely consume useAuth
 function RootLayoutNav() {
   const { isLoggedIn, role } = useAuth();
   const segments = useSegments();
   const router = useRouter();
 
   useEffect(() => {
-    // 1. Identify if the current segment belongs to the protected app flows
-    const inAuthGroup = segments[0] === '(user)' || segments[0] === 'staff' || segments[0] === 'navigate';
+    const inStaffGroup = segments[0] === 'staff';
 
-    if (!isLoggedIn && inAuthGroup) {
-      // 2. The user is logged out but inside the app -> Kick them to the login screen
+    // 1. Kick unauthenticated users out of the staff dashboard
+    if (!isLoggedIn && inStaffGroup) {
       router.replace('/');
-    } else if (isLoggedIn && !inAuthGroup) {
-      // 3. The user is logged in but sitting on a public screen -> Route them to their dashboard
-      if (role === 'ADMIN' || role === 'TECHNICIAN') {
-        router.replace('/staff' as any);
-      } else {
-        router.replace('/(user)' as any);
-      }
+    } 
+    // 2. Auto-route authenticated staff members to their dashboard
+    else if (isLoggedIn && role !== 'NAV_USER' && (!segments[0] || (segments[0] as string) === '(user)')) {
+      // THE FIX: Target the tabs directory specifically to stop the missing index warning
+      router.replace('/staff/(tabs)' as any);
     }
+    // Note: NAV_USER remains on '/' to utilize the radar.
   }, [isLoggedIn, segments, role]);
 
   return (
     <Stack screenOptions={{ headerShown: false }}>
       <Stack.Screen name="index" />
-      <Stack.Screen name="signup" />
-      <Stack.Screen name="(user)" />
       <Stack.Screen name="staff" />
       <Stack.Screen name="navigate/index" />
     </Stack>

@@ -1,7 +1,7 @@
 import * as SecureStore from 'expo-secure-store';
 
 // CRITICAL: Ensure this matches your computer's IPv4 address and Spring Boot port
-const BASE_URL = "http://192.168.3.2:8081/api"; 
+const BASE_URL = "http://192.168.3.2:8080/api"; 
 const TOKEN_KEY = 'echonav_mobile_jwt';
 
 export class ApiClient {
@@ -24,6 +24,8 @@ export class ApiClient {
     const headers: Record<string, string> = {
       'Content-Type': 'application/json',
       'Accept': 'application/json',
+      // THE FIX: Automated App-Key injection for the Spring Boot Firewall
+      'X-EchoNav-App-Key': 'default_dev_app_key_12345',
       ...(options.headers as Record<string, string> || {}),
     };
 

@@ -21,8 +21,11 @@ export class FleetAPI {
     });
   }
 
-  // 4. THE FIX: Cleaned up dead actions, maps status directly to PUT endpoint
-  static async updateTaskStatus(taskId: string, status: string) {
-    return ApiClient.put<any>(`/fleet/tasks/${taskId}`, { status });
+  // 4. THE FIX: Added calibratedRssiBaseline to the PUT payload
+  static async updateTaskStatus(taskId: string, status: string, calibratedRssiBaseline?: number | null) {
+    return ApiClient.put<any>(`/fleet/tasks/${taskId}`, { 
+      status,
+      calibratedRssiBaseline
+    });
   }
 }

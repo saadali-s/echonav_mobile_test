@@ -1,131 +1,180 @@
 import { Feather } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
-import React, { useState } from 'react';
-import { Alert, StyleSheet, TouchableOpacity, View } from 'react-native';
+import React, { useEffect, useRef, useState } from 'react';
+import { Alert, Modal, StyleSheet, TouchableOpacity, View } from 'react-native';
 import { PairingModal } from '../components/domain/PairingModal';
-import { StaffOnboardingModal } from '../components/domain/StaffOnboardingModal';
+import { RadarMap } from '../components/domain/RadarMap';
 import { AppButton } from '../components/ui/AppButton';
 import { AppInput } from '../components/ui/AppInput';
 import { AppScreen } from '../components/ui/AppScreen';
 import { AppText } from '../components/ui/AppText';
+import { BEACON_CONFIG } from '../constants/Config';
 import { Colors, Spacing } from '../constants/theme';
-import { useAuth } from '../context/AuthContext'; // <-- NEW IMPORT
+import { useAuth } from '../context/AuthContext';
+import { useScanner } from '../hooks/useScanner';
 import { AuthAPI } from '../services/AuthAPI';
-export default function LoginScreen() {
+import { NavigationAPI } from '../services/NavigationAPI';
+
+export default function RadarHomeScreen() {
   const router = useRouter();
   const { login } = useAuth();
+  const { startScanning, stopScanning, isScanning, distance, scannedDevice, bluetoothState } = useScanner();
+
+  const [showAccess, setShowAccess] = useState(false);
+  const [showStaffLogin, setShowStaffLogin] = useState(false);
+  
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
-  const [showPassword, setShowPassword] = useState(false);
-  
-  const [showAccess, setShowAccess] = useState(false);
-  const [showStaff, setShowStaff] = useState(false);
-  
   const [isLoading, setIsLoading] = useState(false);
+  const [loginError, setLoginError] = useState(''); 
+  
+  const isResolving = useRef(false);
+
+  // THE FIX: Manual trigger function with a 6-second auto-timeout
+  const handleActivateRadar = () => {
+    startScanning();
+    
+    setTimeout(() => {
+      if (!isResolving.current) {
+        stopScanning();
+        Alert.alert("Scan Complete", "No spatial anchors found nearby.");
+      }
+    }, 6000);
+  };
+
+  // Triggers when the scanner actually picks up a beacon
+  useEffect(() => {
+    const resolveBeacon = async () => {
+      if (scannedDevice && !isResolving.current) {
+        isResolving.current = true;
+        try {
+          console.log("[Radar] Anchor detected. Verifying spatial signature...");
+          
+          await NavigationAPI.resolvePosition(
+            BEACON_CONFIG.UUID,
+            BEACON_CONFIG.MAJOR,
+            BEACON_CONFIG.MINOR
+          );
+          
+          stopScanning();
+          console.log("[Radar] Signature verified. Entering Navigation Engine.");
+          router.push('/navigate' as any);
+        } catch (error) {
+          console.log("[Radar] Signature rejected. Anchor ignored.");
+          setTimeout(() => { isResolving.current = false; }, 3000);
+        }
+      }
+    };
+    
+    resolveBeacon();
+  }, [scannedDevice]);
 
   // --- STAFF LOGIN ---
-  const handleLogin = async () => {
-    if (!email || !password) {
-      Alert.alert("Missing Fields", "Please enter your email and password.");
-      return;
-    }
-
+  const handleStaffLogin = async () => {
+    if (!email || !password) return;
+    setLoginError('');
     try {
       setIsLoading(true);
       const response = await AuthAPI.loginStaff(email, password);
       
-      // THE FIX: Decode JWT and set global state before navigating
-      await login(response.token); 
+      if (!response || typeof response.token !== 'string') {
+        throw new Error("Server returned an invalid authentication token.");
+      }
+
+      await login(response.token, response.userId);
       
-      router.replace('/staff' as any);
+      setShowStaffLogin(false);
+      stopScanning();
+      
+      router.replace('/staff/(tabs)' as any);
     } catch (error: any) {
-      Alert.alert("Access Denied", error.message || "Invalid credentials.");
+      setLoginError(error.message || "Invalid credentials."); 
     } finally {
       setIsLoading(false);
     }
   };
 
   return (
-    <AppScreen scrollable keyboardAvoiding centered>
-      <View style={styles.container}>
-        <View style={styles.header}>
-          <View style={styles.logoBox}>
-            <Feather name="navigation" size={32} color={Colors.white} />
-          </View>
-          <AppText variant="displayMd">EchoNav</AppText>
-          <AppText variant="bodySm" color="secondary" center>
-            Sign in to access your dashboard.
-          </AppText>
+    <AppScreen dark padded={false} scrollable={false} centered>
+      <TouchableOpacity style={styles.cornerBtnLeft} onPress={() => setShowAccess(true)}>
+        <Feather name="key" size={20} color={Colors.textMuted} />
+      </TouchableOpacity>
+
+      <TouchableOpacity style={styles.cornerBtnRight} onPress={() => setShowStaffLogin(true)}>
+        <Feather name="shield" size={20} color={Colors.textMuted} />
+      </TouchableOpacity>
+
+      <View style={styles.centerStage}>
+        <AppText variant="displaySm" color="inverse" center style={{ marginBottom: Spacing.xs }}>
+          EchoNav
+        </AppText>
+        
+        {/* THE FIX: Swapped static text for an active status/button area */}
+        <View style={{ height: 40, marginBottom: Spacing.xl, justifyContent: 'center' }}>
+          {bluetoothState === 'PoweredOff' ? (
+            <AppText variant="caption" color="danger" center>BLUETOOTH ANTENNA IS OFF</AppText>
+          ) : isScanning ? (
+            <AppText variant="caption" color="success" center>SEARCHING FOR SPATIAL ANCHORS...</AppText>
+          ) : (
+            <AppButton compact variant="secondary" onPress={handleActivateRadar} style={{ backgroundColor: 'transparent', borderColor: Colors.border }}>
+              <AppText variant="label" color="inverse">ACTIVATE SCANNER</AppText>
+            </AppButton>
+          )}
         </View>
 
-        <AppInput label="Email Address" placeholder="name@example.com" value={email} onChangeText={setEmail} keyboardType="email-address" autoCapitalize="none" />
-        <AppInput label="Password" placeholder="••••••••" value={password} onChangeText={setPassword} secureTextEntry={!showPassword} 
-          right={
-            <TouchableOpacity onPress={() => setShowPassword(!showPassword)}>
-              <Feather name={showPassword ? "eye-off" : "eye"} size={20} color={Colors.textSecondary} />
-            </TouchableOpacity>
-          }
-        />
-
-        <AppButton onPress={handleLogin} loading={isLoading} style={{ marginTop: Spacing.md }}>
-          LOGIN
-        </AppButton>
-
-        <TouchableOpacity style={styles.signupLink} onPress={() => router.push('/signup' as any)}>
-          <AppText variant="bodySm" color="secondary">
-            Don't have an account? <AppText variant="bodySm" color="link" style={{fontWeight: 'bold'}}>Sign up</AppText>
-          </AppText>
-        </TouchableOpacity>
-
-        <View style={styles.separatorContainer}>
-          <View style={styles.line} />
-          <AppText variant="caption" color="muted" style={{ marginHorizontal: Spacing.sm }}>OR</AppText>
-          <View style={styles.line} />
-        </View>
-
-        <View style={{ gap: Spacing.md }}>
-          <AppButton variant="secondary" icon="eye" onPress={() => setShowAccess(true)}>
-            ACCESSIBILITY SETUP
-          </AppButton>
-          <AppButton variant="ghost" icon="shield" onPress={() => setShowStaff(true)}>
-            STAFF ONBOARDING
-          </AppButton>
-        </View>
+        <RadarMap isScanning={isScanning} distance={distance} heading={0} />
       </View>
 
-      {/* --- CONCIERGE PAIRING --- */}
       <PairingModal 
         visible={showAccess}
         onClose={() => setShowAccess(false)} 
         onAuthenticate={async (accEmail, pin) => {
           try {
             const response = await AuthAPI.pairDevice(accEmail, pin);
-            
-            // THE FIX: Decode JWT and set global state for visually impaired user
-            await login(response.token);
-            
+            await login(response.token, response.userId);
             setShowAccess(false);
-            router.replace('/(user)' as any); 
+            router.replace('/navigate' as any); 
           } catch (error: any) {
             Alert.alert("Pairing Failed", error.message || "Invalid PIN or Email.");
           }
         }}
       />
 
-      <StaffOnboardingModal 
-        visible={showStaff}
-        onClose={() => setShowStaff(false)}
-        onRegister={() => { setShowStaff(false); }}
-      />
+      <Modal visible={showStaffLogin} transparent animationType="fade">
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalCard}>
+            <View style={styles.modalHeader}>
+              <AppText variant="titleMd">Staff Access</AppText>
+              <TouchableOpacity onPress={() => { setShowStaffLogin(false); setLoginError(''); }}>
+                <Feather name="x" size={24} color={Colors.black} />
+              </TouchableOpacity>
+            </View>
+
+            {!!loginError && (
+              <View style={styles.errorBox}>
+                <AppText variant="caption" color="danger" center>{loginError}</AppText>
+              </View>
+            )}
+
+            <AppInput label="Email" value={email} onChangeText={setEmail} autoCapitalize="none" />
+            <AppInput label="Password" value={password} onChangeText={setPassword} secureTextEntry />
+            <AppButton onPress={handleStaffLogin} loading={isLoading} style={{ marginTop: Spacing.md }}>
+              AUTHORIZE
+            </AppButton>
+          </View>
+        </View>
+      </Modal>
+
     </AppScreen>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { width: '100%', maxWidth: 400, paddingVertical: Spacing.xl },
-  header: { alignItems: 'center', marginBottom: Spacing.xxxl },
-  logoBox: { width: 72, height: 72, borderRadius: 20, backgroundColor: Colors.black, justifyContent: 'center', alignItems: 'center', marginBottom: Spacing.lg },
-  signupLink: { marginTop: Spacing.xl, alignItems: 'center' },
-  separatorContainer: { flexDirection: 'row', alignItems: 'center', marginVertical: Spacing.xxl },
-  line: { flex: 1, height: 1, backgroundColor: Colors.borderLight }
+  cornerBtnLeft: { position: 'absolute', top: 60, left: 24, padding: Spacing.sm, zIndex: 10 },
+  cornerBtnRight: { position: 'absolute', top: 60, right: 24, padding: Spacing.sm, zIndex: 10 },
+  centerStage: { width: '100%', alignItems: 'center' },
+  modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.7)', justifyContent: 'center', padding: Spacing.xl },
+  modalCard: { backgroundColor: Colors.white, padding: Spacing.xl, borderRadius: 16 },
+  modalHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: Spacing.xl },
+  errorBox: { backgroundColor: Colors.dangerBg, padding: Spacing.sm, borderRadius: 6, marginBottom: Spacing.sm, borderWidth: 1, borderColor: Colors.dangerBorder }
 });

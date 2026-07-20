@@ -6,15 +6,19 @@ export class MapStudioAPI {
     return ApiClient.get<any[]>(`/mapstudio/organisations/${orgId}/buildings`);
   }
 
-  // --- ISSUE 1 FIX: New Public Fetcher ---
+  // Shared: Gets public buildings
   static async getPublicBuildings() {
     return ApiClient.get<any[]>('/mapstudio/buildings/public');
   }
 
-  // --- THE RESTORED MISSING METHOD ---
   // Shared: Gets specific floor plans for a building
   static async getFloorPlans(buildingId: string) {
     return ApiClient.get<any[]>(`/mapstudio/buildings/${buildingId}/floorplans`);
+  }
+
+  // THE FIX: Added the missing fetcher for the spatial graph
+  static async getSpatialGraph(floorPlanId: string) {
+    return ApiClient.get<any>(`/mapstudio/floorplans/${floorPlanId}/graph`);
   }
 
   // Admin: Setting the physical scale ruler

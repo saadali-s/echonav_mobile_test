@@ -28,7 +28,7 @@ interface AuthState {
 }
 
 interface AuthContextType extends AuthState {
-  login: (token: string) => Promise<void>;
+  login: (token: string, explicitUserId?: string | number) => Promise<void>;
   logout: () => Promise<void>;
 }
 
@@ -53,16 +53,19 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     loadToken();
   }, []);
 
-  const login = async (token: string) => {
+  const login = async (token: string, explicitUserId?: string | number) => {
     await ApiClient.setToken(token);
     const decoded = decodeJWT(token);
+    
+    // THE FIX: Pulls the user_id from the new JWT claim if an explicit one isn't passed
+    const finalUserId = explicitUserId ? String(explicitUserId) : (decoded?.user_id ? String(decoded.user_id) : null);
     
     setAuthState({
       isLoggedIn: true,
       token,
       role: decoded?.role || null,
       orgId: decoded?.organization_id ? String(decoded.organization_id) : null,
-      userId: decoded?.sub || null, 
+      userId: finalUserId, 
     });
   };
 
@@ -71,7 +74,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     setAuthState({ isLoggedIn: false, token: null, role: null, orgId: null, userId: null });
   };
 
-  // Removed whitespace around {children} to prevent Text Node crashes
   return <AuthContext.Provider value={{ ...authState, login, logout }}>{children}</AuthContext.Provider>;
 }
 
