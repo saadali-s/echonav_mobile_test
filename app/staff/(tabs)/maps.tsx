@@ -1,55 +1,62 @@
 import { useRouter } from 'expo-router';
+import { useColorScheme } from 'nativewind';
 import React, { useEffect, useState } from 'react';
-import { ActivityIndicator, Alert, FlatList, View } from 'react-native';
-import { FloorPlanCard } from '../../../components/domain/FloorPlanCard';
+import { ActivityIndicator, FlatList, RefreshControl, View } from 'react-native';
+import { FloorPlanCard } from '../../../components/maps/FloorPlanCard';
 import { AppScreen } from '../../../components/ui/AppScreen';
 import { AppText } from '../../../components/ui/AppText';
 import { SearchInput } from '../../../components/ui/SearchInput';
-import { Colors, Spacing } from '../../../constants/theme';
-import { useAuth } from '../../../context/AuthContext';
-import { MapStudioAPI } from '../../../services/MapStudioAPI';
+import { useAppAlert } from '../../../core/context/AlertContext';
+import { useAuth } from '../../../core/context/AuthContext';
+import { MapStudioAPI } from '../../../core/services/MapStudioAPI';
 
 export default function MapsScreen() {
   const router = useRouter();
   const { orgId } = useAuth();
+  const { showAlert } = useAppAlert();
+  const { colorScheme } = useColorScheme();
   
   const [search, setSearch] = useState('');
   const [maps, setMaps] = useState<any[]>([]);
+  
   const [isLoading, setIsLoading] = useState(true);
+  const [isRefreshing, setIsRefreshing] = useState(false);
 
-  // THE FIX: Fetch buildings, then flatten all associated floor plans for the explorer view
+  const fetchAllMaps = async () => {
+    if (!orgId) return;
+    try {
+      const buildings = await MapStudioAPI.getBuildings(orgId);
+      
+      const floorPlanPromises = buildings.map(async (b: any) => {
+        const plans = await MapStudioAPI.getFloorPlans(b.id);
+        return plans.map((p: any) => ({
+          id: String(p.id),
+          title: p.name || 'Unnamed Floor',
+          building: b.name || 'Unknown Building'
+        }));
+      });
+
+      const results = await Promise.all(floorPlanPromises);
+      setMaps(results.flat());
+    } catch (error: any) {
+      showAlert("NETWORK ERROR", error.message || "Failed to load map directory.", "error");
+    }
+  };
+
   useEffect(() => {
-    const fetchAllMaps = async () => {
-      if (!orgId) return;
-      try {
-        setIsLoading(true);
-        const buildings = await MapStudioAPI.getBuildings(orgId);
-        
-        let allFloorPlans: any[] = [];
-        
-        // Fetch floor plans for every building concurrently
-        const floorPlanPromises = buildings.map(async (b: any) => {
-          const plans = await MapStudioAPI.getFloorPlans(b.id);
-          return plans.map((p: any) => ({
-            id: String(p.id),
-            title: p.name || 'Unnamed Floor',
-            building: b.name || 'Unknown Building'
-          }));
-        });
-
-        const results = await Promise.all(floorPlanPromises);
-        allFloorPlans = results.flat();
-        
-        setMaps(allFloorPlans);
-      } catch (error: any) {
-        Alert.alert("Network Error", error.message || "Failed to load map directory.");
-      } finally {
-        setIsLoading(false);
-      }
+    const initLoad = async () => {
+      setIsLoading(true);
+      await fetchAllMaps();
+      setIsLoading(false);
     };
-
-    fetchAllMaps();
+    initLoad();
   }, [orgId]);
+
+  const handleRefresh = async () => {
+    setIsRefreshing(true);
+    await fetchAllMaps();
+    setIsRefreshing(false);
+  };
 
   const filteredMaps = maps.filter(m => 
     m.title.toLowerCase().includes(search.toLowerCase()) || 
@@ -58,8 +65,8 @@ export default function MapsScreen() {
 
   return (
     <AppScreen padded={false} scrollable={false}>
-      <View style={{ padding: Spacing.xl, backgroundColor: Colors.white, borderBottomWidth: 3, borderBottomColor: Colors.black }}>
-        <AppText variant="displaySm" style={{ marginBottom: Spacing.md }}>Site Explorer</AppText>
+      <View className="p-5 bg-white dark:bg-zinc-950 border-b-[3px] border-black dark:border-zinc-800">
+        <AppText variant="displaySm" className="mb-3">Site Explorer</AppText>
         <SearchInput 
           value={search} 
           onChangeText={setSearch} 
@@ -68,19 +75,20 @@ export default function MapsScreen() {
       </View>
 
       {isLoading ? (
-        <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
-          <ActivityIndicator size="large" color={Colors.black} />
-          <AppText variant="caption" color="muted" style={{ marginTop: Spacing.md }}>DOWNLOADING VECTORS...</AppText>
+        <View className="flex-1 justify-center items-center">
+          <ActivityIndicator size="large" color={colorScheme === 'dark' ? '#10b981' : '#000'} />
+          <AppText variant="caption" color="muted" className="mt-4">DOWNLOADING VECTORS...</AppText>
         </View>
       ) : (
         <FlatList
           data={filteredMaps}
           numColumns={2}
           keyExtractor={(item) => item.id}
-          columnWrapperStyle={{ justifyContent: 'space-between', paddingHorizontal: Spacing.xl }}
-          contentContainerStyle={{ paddingVertical: Spacing.xl, paddingBottom: 100 }}
+          columnWrapperStyle={{ justifyContent: 'space-between', paddingHorizontal: 20 }}
+          contentContainerStyle={{ paddingVertical: 20, paddingBottom: 100 }}
+          refreshControl={<RefreshControl refreshing={isRefreshing} onRefresh={handleRefresh} tintColor="#10b981" colors={['#10b981']} />}
           renderItem={({ item }) => (
-            <View style={{ width: '48%', marginBottom: Spacing.lg }}>
+            <View style={{ width: '48%', marginBottom: 16 }}>
               <FloorPlanCard 
                 title={item.title} 
                 building={item.building} 
@@ -89,7 +97,7 @@ export default function MapsScreen() {
             </View>
           )}
           ListEmptyComponent={() => (
-            <View style={{ alignItems: 'center', marginTop: 60 }}>
+            <View className="items-center mt-[60px]">
               <AppText variant="body" color="muted">No maps uploaded for this organization.</AppText>
             </View>
           )}

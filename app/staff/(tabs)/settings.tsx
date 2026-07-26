@@ -1,13 +1,19 @@
+import { useColorScheme } from 'nativewind';
 import React, { useEffect, useState } from 'react';
-import { ActivityIndicator, Alert, ScrollView, View } from 'react-native';
+import { ActivityIndicator, ScrollView, Switch, View } from 'react-native';
 import { AppButton } from '../../../components/ui/AppButton';
 import { AppInput } from '../../../components/ui/AppInput';
 import { AppScreen } from '../../../components/ui/AppScreen';
 import { AppText } from '../../../components/ui/AppText';
-import { Colors, Spacing } from '../../../constants/theme';
-import { AuthAPI } from '../../../services/AuthAPI';
+import { useAppAlert } from '../../../core/context/AlertContext';
+import { AuthAPI } from '../../../core/services/AuthAPI';
 
 export default function SettingsScreen() {
+  const { showAlert } = useAppAlert();
+  
+  // THE FIX: NativeWind's powerful theme controller
+  const { colorScheme, toggleColorScheme } = useColorScheme();
+  
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [role, setRole] = useState('');
@@ -30,28 +36,42 @@ export default function SettingsScreen() {
   }, []);
 
   const handleSave = () => {
-    // THE FIX: Provide explicit user feedback
-    Alert.alert("Profile Updated", "Your changes have been saved successfully.");
+    showAlert("PROFILE UPDATED", "Your changes have been saved successfully.", "success");
   };
 
   if (isLoading) {
     return (
       <AppScreen centered>
-        <ActivityIndicator size="large" color={Colors.black} />
+        <ActivityIndicator size="large" color={colorScheme === 'dark' ? '#fff' : '#000'} />
       </AppScreen>
     );
   }
 
   return (
     <AppScreen padded={false}>
-      <View style={{ padding: Spacing.xl, borderBottomWidth: 3, borderBottomColor: Colors.black, backgroundColor: Colors.white }}>
+      <View className="p-5 bg-white dark:bg-black border-b-4 border-black dark:border-zinc-800">
         <AppText variant="displaySm">Settings</AppText>
       </View>
 
-      <ScrollView contentContainerStyle={{ padding: Spacing.xl, gap: Spacing.lg }}>
+      <ScrollView contentContainerStyle={{ padding: 20, gap: 16 }}>
+        
+        {/* THE FIX: Brutalist Dark Mode Toggle */}
+        <View className="gap-3 mb-2">
+          <AppText variant="label" color="muted">Preferences</AppText>
+          <View className="flex-row items-center justify-between bg-white dark:bg-zinc-900 border-2 border-zinc-950 dark:border-zinc-700 border-b-[5px] border-r-[3px] rounded-xl p-4">
+            <AppText variant="bodyMd">Dark Mode</AppText>
+            <Switch 
+               value={colorScheme === 'dark'} 
+               onValueChange={toggleColorScheme} 
+               trackColor={{ false: '#e4e4e7', true: '#10b981' }}
+               thumbColor={colorScheme === 'dark' ? '#fff' : '#18181b'}
+            />
+          </View>
+        </View>
+
         <AppText variant="label" color="muted">Profile Details</AppText>
         
-        <View style={{ gap: Spacing.sm }}>
+        <View className="gap-3">
           <AppInput 
             label="Full Name" 
             value={name} 
@@ -64,16 +84,16 @@ export default function SettingsScreen() {
             editable={false}
             keyboardType="email-address" 
             autoCapitalize="none" 
-            style={{ opacity: 0.6 }}
+            className="opacity-60"
           />
           <AppInput 
             label="Authorization Role" 
             value={role} 
             editable={false}
-            style={{ opacity: 0.6 }} 
+            className="opacity-60" 
           />
           
-          <AppButton onPress={handleSave} style={{ marginTop: Spacing.md }}>
+          <AppButton onPress={handleSave} className="mt-3">
             SAVE DETAILS
           </AppButton>
         </View>

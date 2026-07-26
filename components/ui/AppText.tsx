@@ -1,52 +1,50 @@
 import React from 'react';
-import { Text, TextProps, TextStyle } from 'react-native';
-import { Colors, Typography } from '../../constants/theme';
+import { Text, TextProps } from 'react-native';
 
-type TextVariant = keyof typeof Typography;
-type TextColor = keyof typeof COLOR_MAP;
+const VARIANT_CLASSES = {
+  displayLg: 'text-4xl font-black tracking-widest',
+  displayMd: 'text-2xl font-black tracking-wide',
+  displaySm: 'text-xl font-black',
+  titleLg: 'text-lg font-black uppercase',
+  titleMd: 'text-base font-black uppercase',
+  titleSm: 'text-sm font-extrabold uppercase tracking-widest',
+  body: 'text-base font-semibold',
+  bodyMd: 'text-sm font-semibold',
+  bodySm: 'text-xs font-semibold',
+  label: 'text-xs font-extrabold uppercase tracking-widest',
+  caption: 'text-[10px] font-extrabold uppercase',
+  link: 'text-sm font-bold underline',
+};
+
+const COLOR_CLASSES = {
+  primary: 'text-zinc-950 dark:text-white',
+  secondary: 'text-zinc-500 dark:text-zinc-400',
+  muted: 'text-zinc-400 dark:text-zinc-500', // THE FIX: Better contrast for dark mode
+  inverse: 'text-white dark:text-zinc-950',
+  link: 'text-zinc-600 dark:text-blue-400',
+  success: 'text-emerald-700 dark:text-emerald-400',
+  danger: 'text-red-700 dark:text-red-400',
+  warning: 'text-amber-700 dark:text-amber-400',
+  info: 'text-blue-700 dark:text-blue-400',
+};
 
 interface AppTextProps extends TextProps {
   children: React.ReactNode;
-  variant?: TextVariant;
-  color?: TextColor;
+  variant?: keyof typeof VARIANT_CLASSES;
+  color?: keyof typeof COLOR_CLASSES;
   center?: boolean;
   uppercase?: boolean;
+  className?: string;
 }
 
-const COLOR_MAP = {
-  primary: Colors.textPrimary,
-  secondary: Colors.textSecondary,
-  muted: Colors.textMuted,
-  inverse: Colors.textInverse,
-  link: Colors.textLink,
-  success: Colors.successText,
-  danger: Colors.dangerText,
-  warning: Colors.warningText,
-  info: Colors.infoText,
-};
-
-export function AppText({
-  children,
-  variant = 'body',
-  color = 'primary',
-  style,
-  center,
-  uppercase,
-  ...props
-}: AppTextProps) {
-  // Safe indexing with a fallback to 'body' style
-  const baseStyle = Typography[variant] || Typography.body;
-
-  const resolvedStyle: TextStyle[] = [
-    baseStyle as TextStyle,
-    { color: COLOR_MAP[color] },
-    center && { textAlign: 'center' },
-    uppercase && { textTransform: 'uppercase' },
-    style as TextStyle,
-  ].filter(Boolean) as TextStyle[];
+export function AppText({ children, variant = 'body', color = 'primary', center, uppercase, className = '', ...props }: AppTextProps) {
+  const baseClass = VARIANT_CLASSES[variant];
+  const colorClass = COLOR_CLASSES[color];
+  const alignClass = center ? 'text-center' : '';
+  const transformClass = uppercase ? 'uppercase' : '';
 
   return (
-    <Text style={resolvedStyle} {...props}>
+    <Text className={`${baseClass} ${colorClass} ${alignClass} ${transformClass} ${className}`} {...props}>
       {children}
     </Text>
   );

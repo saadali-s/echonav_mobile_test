@@ -1,100 +1,64 @@
+import { Feather } from '@expo/vector-icons';
 import React from 'react';
-import { StyleSheet, ViewStyle } from 'react-native';
-import { Button } from 'react-native-paper';
-
-type AppButtonVariant = 'primary' | 'secondary' | 'danger' | 'ghost';
+import { ActivityIndicator, TouchableOpacity, View } from 'react-native';
+import { AppText } from './AppText';
 
 interface AppButtonProps {
   children: React.ReactNode;
   onPress: () => void;
   loading?: boolean;
   disabled?: boolean;
-  variant?: AppButtonVariant;
-  style?: ViewStyle;
+  variant?: 'primary' | 'secondary' | 'danger' | 'ghost';
   compact?: boolean;
-  icon?: string;
+  icon?: keyof typeof Feather.glyphMap;
   fullWidth?: boolean;
-  testID?: string;
+  className?: string;
 }
 
-export function AppButton({
-  children,
-  onPress,
-  loading = false,
-  disabled = false,
-  variant = 'primary',
-  style,
-  compact = false,
-  icon,
-  fullWidth = true,
-  testID,
-}: AppButtonProps) {
-  const mode =
-    variant === 'primary' ? 'contained' :
-    variant === 'secondary' ? 'outlined' :
-    variant === 'danger' ? 'contained' :
-    'text';
+export function AppButton({ children, onPress, loading, disabled, variant = 'primary', compact = false, icon, fullWidth = true, className = '' }: AppButtonProps) {
+  const isGhost = variant === 'ghost';
+  const isSecondary = variant === 'secondary';
+  const isDanger = variant === 'danger';
 
-  const buttonStyle = [
-    styles.base,
-    fullWidth && styles.fullWidth,
-    variant === 'danger' && styles.danger,
-    variant === 'secondary' && styles.secondary,
-    variant === 'ghost' && styles.ghost,
-    style,
-  ];
+  const baseClasses = `flex-row items-center justify-center rounded-xl active:scale-95 transition-transform`;
+  const sizeClasses = compact ? 'h-10 px-4' : 'h-14 px-6';
+  const widthClasses = fullWidth ? 'w-full' : 'self-start';
 
-  const textColor =
-    variant === 'primary' ? '#ffffff' :
-    variant === 'danger' ? '#ffffff' :
-    '#18181b';
+  // Injecting Color and Brutalist borders to make Light Mode pop
+  let bgClass = 'bg-emerald-500 dark:bg-emerald-600';
+  let borderClass = 'border-2 border-b-[4px] border-emerald-700 dark:border-emerald-800';
+  let textCol = 'inverse';
+
+  if (isSecondary) {
+    bgClass = 'bg-white dark:bg-zinc-900';
+    borderClass = 'border-2 border-b-[4px] border-black dark:border-zinc-700';
+    textCol = 'primary';
+  } else if (isDanger) {
+    bgClass = 'bg-red-500 dark:bg-red-700';
+    borderClass = 'border-2 border-b-[4px] border-red-700 dark:border-red-900';
+    textCol = 'inverse';
+  } else if (isGhost) {
+    bgClass = 'bg-transparent';
+    borderClass = '';
+    textCol = 'primary';
+  }
+
+  const opacity = disabled || loading ? 'opacity-50' : 'opacity-100';
 
   return (
-    <Button
-      testID={testID}
-      mode={mode as any}
+    <TouchableOpacity
       onPress={onPress}
-      loading={loading}
       disabled={disabled || loading}
-      compact={compact}
-      icon={icon}
-      style={buttonStyle}
-      labelStyle={[styles.label, { color: textColor }]}
-      contentStyle={styles.content}
-      buttonColor={variant === 'primary' ? '#18181b' : variant === 'danger' ? '#b91c1c' : undefined}
-      textColor={textColor}
+      className={`${baseClasses} ${sizeClasses} ${widthClasses} ${bgClass} ${borderClass} ${opacity} ${className}`}
     >
-      {children}
-    </Button>
+      {loading ? (
+         <ActivityIndicator color={isSecondary || isGhost ? '#888' : '#fff'} />
+      ) : (
+        <View className="flex-row items-center justify-center gap-2">
+          {icon && <Feather name={icon} size={18} className={isSecondary || isGhost ? 'text-black dark:text-white' : 'text-white'} />}
+          <AppText variant="label" color={textCol as any}>{children}</AppText>
+        </View>
+      )}
+    </TouchableOpacity>
   );
 }
-
-const styles = StyleSheet.create({
-  base: {
-    borderRadius: 12,
-    marginTop: 0,
-  },
-  fullWidth: {
-    width: '100%',
-  },
-  content: {
-    height: 54,
-  },
-  label: {
-    fontSize: 14,
-    fontWeight: '900',
-    letterSpacing: 0.8,
-    textTransform: 'uppercase',
-  },
-  secondary: {
-    borderWidth: 2,
-    borderColor: '#18181b',
-    backgroundColor: '#ffffff',
-  },
-  ghost: {
-    backgroundColor: 'transparent',
-  },
-  danger: {
-    borderWidth: 0,
-  },
-});

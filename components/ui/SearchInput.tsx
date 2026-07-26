@@ -1,24 +1,18 @@
 import { Feather } from '@expo/vector-icons';
 import React from 'react';
-import { StyleSheet, TextInput, View } from 'react-native';
-import { Brutalist, Colors, Spacing } from '../../constants/theme';
+import { TextInput, View } from 'react-native';
 
 export function SearchInput({ value, onChangeText, placeholder = "Search..." }: any) {
   return (
-    <View style={[Brutalist.inner, styles.container]}>
-      <Feather name="search" size={18} color={Colors.textMuted} />
+    <View className="flex-row items-center px-4 h-12 bg-zinc-100 dark:bg-zinc-900 border-2 border-zinc-950 dark:border-zinc-700 rounded-xl">
+      <Feather name="search" size={18} className="text-zinc-400 dark:text-zinc-500" />
       <TextInput
         value={value}
         onChangeText={onChangeText}
         placeholder={placeholder}
-        placeholderTextColor={Colors.textMuted}
-        style={styles.input}
+        placeholderTextColor="#a1a1aa"
+        className="flex-1 ml-2 font-bold text-zinc-950 dark:text-white"
       />
     </View>
   );
 }
-
-const styles = StyleSheet.create({
-  container: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: Spacing.md, height: 50 },
-  input: { flex: 1, marginLeft: Spacing.sm, fontWeight: '700', color: Colors.black }
-});

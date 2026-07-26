@@ -1,78 +1,88 @@
 import { Feather } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import React, { useEffect, useRef, useState } from 'react';
-import { Alert, Modal, StyleSheet, TouchableOpacity, View } from 'react-native';
-import { PairingModal } from '../components/domain/PairingModal';
-import { RadarMap } from '../components/domain/RadarMap';
+import { KeyboardAvoidingView, Modal, Platform, ScrollView, TouchableOpacity, View } from 'react-native';
+import { PairingModal } from '../components/auth/PairingModal';
+import { RadarMap } from '../components/navigation/RadarMap';
 import { AppButton } from '../components/ui/AppButton';
 import { AppInput } from '../components/ui/AppInput';
 import { AppScreen } from '../components/ui/AppScreen';
 import { AppText } from '../components/ui/AppText';
-import { BEACON_CONFIG } from '../constants/Config';
-import { Colors, Spacing } from '../constants/theme';
-import { useAuth } from '../context/AuthContext';
-import { useScanner } from '../hooks/useScanner';
-import { AuthAPI } from '../services/AuthAPI';
-import { NavigationAPI } from '../services/NavigationAPI';
+import { BEACON_CONFIG } from '../core/constants/Config';
+import { useAppAlert } from '../core/context/AlertContext';
+import { useAuth } from '../core/context/AuthContext';
+import { useScanner } from '../core/hooks/useScanner';
+import { AuthAPI } from '../core/services/AuthAPI';
+import { NavigationAPI } from '../core/services/NavigationAPI';
 
 export default function RadarHomeScreen() {
   const router = useRouter();
   const { login } = useAuth();
-  const { startScanning, stopScanning, isScanning, distance, scannedDevice, bluetoothState } = useScanner();
+  const { showAlert } = useAppAlert();
+  
+  const { startScanning, stopScanning, isScanning, distance, scannedDevicesList, bluetoothState } = useScanner();
 
   const [showAccess, setShowAccess] = useState(false);
   const [showStaffLogin, setShowStaffLogin] = useState(false);
-  
+  const [pendingRoute, setPendingRoute] = useState<{startNodeId: string, floorPlanId: string} | null>(null);
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [isLoading, setIsLoading] = useState(false);
-  const [loginError, setLoginError] = useState(''); 
   
   const isResolving = useRef(false);
+  const scannedListRef = useRef<any[]>([]);
 
-  // THE FIX: Manual trigger function with a 6-second auto-timeout
-  const handleActivateRadar = () => {
-    startScanning();
-    
-    setTimeout(() => {
-      if (!isResolving.current) {
-        stopScanning();
-        Alert.alert("Scan Complete", "No spatial anchors found nearby.");
-      }
-    }, 6000);
-  };
-
-  // Triggers when the scanner actually picks up a beacon
   useEffect(() => {
-    const resolveBeacon = async () => {
-      if (scannedDevice && !isResolving.current) {
-        isResolving.current = true;
+    scannedListRef.current = scannedDevicesList;
+  }, [scannedDevicesList]);
+
+  const handleActivateRadar = async () => {
+    if (isResolving.current) return;
+    isResolving.current = true;
+    
+    try {
+      await startScanning();
+    } catch (err: any) {
+      showAlert('SCANNER OFFLINE', err.message, 'error');
+      isResolving.current = false;
+      return;
+    }
+    
+    setTimeout(async () => {
+      stopScanning();
+      
+      const topDevices = scannedListRef.current;
+      
+      if (topDevices.length > 0) {
+        const closestBeacon = topDevices[0];
+
         try {
-          console.log("[Radar] Anchor detected. Verifying spatial signature...");
-          
-          await NavigationAPI.resolvePosition(
-            BEACON_CONFIG.UUID,
+          const response = await NavigationAPI.resolvePosition(
+            closestBeacon.uuid,
             BEACON_CONFIG.MAJOR,
             BEACON_CONFIG.MINOR
           );
           
-          stopScanning();
-          console.log("[Radar] Signature verified. Entering Navigation Engine.");
-          router.push('/navigate' as any);
-        } catch (error) {
-          console.log("[Radar] Signature rejected. Anchor ignored.");
-          setTimeout(() => { isResolving.current = false; }, 3000);
-        }
-      }
-    };
-    
-    resolveBeacon();
-  }, [scannedDevice]);
+          if (response.privacyLevel === 'PRIVATE') {
+            setPendingRoute({ startNodeId: String(response.node.id), floorPlanId: String(response.floorPlanId) });
+            setShowAccess(true);
+          } else {
+            router.push({ pathname: '/navigate', params: { startNodeId: String(response.node.id), floorPlanId: String(response.floorPlanId) } });
+          }
 
-  // --- STAFF LOGIN ---
+        } catch (error: any) {
+          showAlert("RESOLUTION FAILED", error.message || "Hardware signature not recognized by the server.", "error");
+        }
+      } else {
+        showAlert("SCAN COMPLETE", "No spatial anchors found nearby.", "info");
+      }
+      
+      isResolving.current = false;
+    }, 2500);
+  };
+
   const handleStaffLogin = async () => {
     if (!email || !password) return;
-    setLoginError('');
     try {
       setIsLoading(true);
       const response = await AuthAPI.loginStaff(email, password);
@@ -88,36 +98,46 @@ export default function RadarHomeScreen() {
       
       router.replace('/staff/(tabs)' as any);
     } catch (error: any) {
-      setLoginError(error.message || "Invalid credentials."); 
+      showAlert("AUTHENTICATION FAILED", error.message || "Invalid credentials.", "error");
     } finally {
       setIsLoading(false);
     }
   };
 
   return (
-    <AppScreen dark padded={false} scrollable={false} centered>
-      <TouchableOpacity style={styles.cornerBtnLeft} onPress={() => setShowAccess(true)}>
-        <Feather name="key" size={20} color={Colors.textMuted} />
-      </TouchableOpacity>
+    <AppScreen padded={false} scrollable={false} centered>
+      
+      <View pointerEvents="box-none" className="absolute top-[60px] w-full px-6 flex-row justify-between items-center z-10">
+        <TouchableOpacity 
+          className="flex-row items-center bg-white dark:bg-zinc-900 px-4 py-2 rounded-full border-2 border-black dark:border-zinc-700 shadow-sm" 
+          onPress={() => setShowAccess(true)}
+        >
+          <Feather name="key" size={16} className="text-emerald-600 dark:text-emerald-500 mr-2" />
+          <AppText variant="label" color="primary">Bind</AppText>
+        </TouchableOpacity>
 
-      <TouchableOpacity style={styles.cornerBtnRight} onPress={() => setShowStaffLogin(true)}>
-        <Feather name="shield" size={20} color={Colors.textMuted} />
-      </TouchableOpacity>
+        <TouchableOpacity 
+          className="flex-row items-center bg-white dark:bg-zinc-900 px-4 py-2 rounded-full border-2 border-black dark:border-zinc-700 shadow-sm" 
+          onPress={() => setShowStaffLogin(true)}
+        >
+          <AppText variant="label" color="primary" className="mr-2">Staff</AppText>
+          <Feather name="shield" size={16} className="text-blue-600 dark:text-blue-500" />
+        </TouchableOpacity>
+      </View>
 
-      <View style={styles.centerStage}>
-        <AppText variant="displaySm" color="inverse" center style={{ marginBottom: Spacing.xs }}>
+      <View className="w-full items-center mt-10">
+        <AppText variant="displaySm" color="primary" center className="mb-4">
           EchoNav
         </AppText>
         
-        {/* THE FIX: Swapped static text for an active status/button area */}
-        <View style={{ height: 40, marginBottom: Spacing.xl, justifyContent: 'center' }}>
+        <View className="min-h-[56px] w-[85%] mb-8 justify-center">
           {bluetoothState === 'PoweredOff' ? (
             <AppText variant="caption" color="danger" center>BLUETOOTH ANTENNA IS OFF</AppText>
           ) : isScanning ? (
             <AppText variant="caption" color="success" center>SEARCHING FOR SPATIAL ANCHORS...</AppText>
           ) : (
-            <AppButton compact variant="secondary" onPress={handleActivateRadar} style={{ backgroundColor: 'transparent', borderColor: Colors.border }}>
-              <AppText variant="label" color="inverse">ACTIVATE SCANNER</AppText>
+            <AppButton variant="primary" icon="radio" onPress={handleActivateRadar}>
+              ACTIVATE SCANNER
             </AppButton>
           )}
         </View>
@@ -127,54 +147,55 @@ export default function RadarHomeScreen() {
 
       <PairingModal 
         visible={showAccess}
-        onClose={() => setShowAccess(false)} 
+        onClose={() => { setShowAccess(false); isResolving.current = false; setPendingRoute(null); }} 
         onAuthenticate={async (accEmail, pin) => {
           try {
             const response = await AuthAPI.pairDevice(accEmail, pin);
             await login(response.token, response.userId);
             setShowAccess(false);
-            router.replace('/navigate' as any); 
+            
+            if (pendingRoute) {
+               router.replace({ pathname: '/navigate', params: pendingRoute } as any);
+            } else {
+               showAlert("SUCCESS", "Device paired, but no anchor was scanned to route to.", "success");
+            }
           } catch (error: any) {
-            Alert.alert("Pairing Failed", error.message || "Invalid PIN or Email.");
+            showAlert("PAIRING FAILED", error.message || "Invalid PIN or Email.", "error");
           }
         }}
       />
 
       <Modal visible={showStaffLogin} transparent animationType="fade">
-        <View style={styles.modalOverlay}>
-          <View style={styles.modalCard}>
-            <View style={styles.modalHeader}>
-              <AppText variant="titleMd">Staff Access</AppText>
-              <TouchableOpacity onPress={() => { setShowStaffLogin(false); setLoginError(''); }}>
-                <Feather name="x" size={24} color={Colors.black} />
-              </TouchableOpacity>
-            </View>
+        <View className="flex-1 bg-black/70">
+          {/* THE FIX: behavior="padding" universally + isolated outer View */}
+          <KeyboardAvoidingView 
+            behavior="padding" 
+            className="flex-1"
+          >
+            <ScrollView 
+              contentContainerStyle={{ flexGrow: 1, justifyContent: 'center', padding: 20 }}
+              keyboardShouldPersistTaps="handled"
+              showsVerticalScrollIndicator={false}
+            >
+              <View className="bg-white dark:bg-zinc-950 p-6 rounded-2xl border-2 border-black dark:border-zinc-800">
+                <View className="flex-row justify-between items-center mb-5">
+                  <AppText variant="titleMd">Staff Access</AppText>
+                  <TouchableOpacity onPress={() => setShowStaffLogin(false)}>
+                    <Feather name="x" size={24} className="text-black dark:text-white" />
+                  </TouchableOpacity>
+                </View>
 
-            {!!loginError && (
-              <View style={styles.errorBox}>
-                <AppText variant="caption" color="danger" center>{loginError}</AppText>
+                <AppInput label="Email" value={email} onChangeText={setEmail} autoCapitalize="none" keyboardType="email-address" />
+                <AppInput label="Password" value={password} onChangeText={setPassword} secureTextEntry />
+                <AppButton onPress={handleStaffLogin} loading={isLoading} className="mt-3">
+                  AUTHORIZE
+                </AppButton>
               </View>
-            )}
-
-            <AppInput label="Email" value={email} onChangeText={setEmail} autoCapitalize="none" />
-            <AppInput label="Password" value={password} onChangeText={setPassword} secureTextEntry />
-            <AppButton onPress={handleStaffLogin} loading={isLoading} style={{ marginTop: Spacing.md }}>
-              AUTHORIZE
-            </AppButton>
-          </View>
+            </ScrollView>
+          </KeyboardAvoidingView>
         </View>
       </Modal>
 
     </AppScreen>
   );
 }
-
-const styles = StyleSheet.create({
-  cornerBtnLeft: { position: 'absolute', top: 60, left: 24, padding: Spacing.sm, zIndex: 10 },
-  cornerBtnRight: { position: 'absolute', top: 60, right: 24, padding: Spacing.sm, zIndex: 10 },
-  centerStage: { width: '100%', alignItems: 'center' },
-  modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.7)', justifyContent: 'center', padding: Spacing.xl },
-  modalCard: { backgroundColor: Colors.white, padding: Spacing.xl, borderRadius: 16 },
-  modalHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: Spacing.xl },
-  errorBox: { backgroundColor: Colors.dangerBg, padding: Spacing.sm, borderRadius: 6, marginBottom: Spacing.sm, borderWidth: 1, borderColor: Colors.dangerBorder }
-});

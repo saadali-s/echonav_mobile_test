@@ -1,38 +1,55 @@
-import { BindingChecklist } from '@/components/domain/BindingChecklist';
+import { BindingChecklist } from '@/components/fleet/BindingChecklist';
 import { AppButton } from '@/components/ui/AppButton';
 import { AppScreen } from '@/components/ui/AppScreen';
 import { AppText } from '@/components/ui/AppText';
-import { BEACON_CONFIG } from '@/constants/Config';
-import { Spacing } from '@/constants/theme';
-import { useScanner } from '@/hooks/useScanner';
-import { FleetAPI } from '@/services/FleetAPI';
+import { BEACON_CONFIG } from '@/core/constants/Config';
+import { Spacing } from '@/core/constants/theme';
+import { useAppAlert } from '@/core/context/AlertContext';
+import { useScanner } from '@/core/hooks/useScanner';
+import { FleetAPI } from '@/core/services/FleetAPI';
 import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
-import React, { useEffect, useState } from 'react';
-import { Alert, View } from 'react-native';
+import React, { useState } from 'react';
+import { View } from 'react-native';
 
 export default function TaskExecutionScreen() {
   const { id } = useLocalSearchParams();
   const router = useRouter();
-  const { isScanning, rssi: rawRssi, startScanning, stopScanning } = useScanner();
+  const { showAlert } = useAppAlert();
+  
+  const { isScanning, rssi: rawRssi, scannedDevicesList, startScanning, stopScanning, bluetoothState } = useScanner();
   
   const [isPlaced, setIsPlaced] = useState(false);
   const [isBound, setIsBound] = useState(false);
 
-  useEffect(() => {
-    const bindHardware = async () => {
-      if (isScanning && rawRssi !== null && !isBound) {
-        stopScanning();
-        try {
-          // THE FIX: Physically link the hardware to the node in the database
-          await FleetAPI.linkBeacon(id as string, BEACON_CONFIG.UUID, BEACON_CONFIG.MAJOR, BEACON_CONFIG.MINOR);
-          setIsBound(true);
-        } catch (e: any) {
-          Alert.alert("Binding Failed", e.message || "Could not link beacon to node.");
-        }
-      }
-    };
-    bindHardware();
-  }, [rawRssi, isScanning, stopScanning, isBound, id]);
+  const handleScan = async () => {
+    try {
+      await startScanning();
+    } catch (err: any) {
+      showAlert('HARDWARE ERROR', err.message, 'error');
+    }
+  };
+
+  const handleBindBeacon = async (selectedUuid: string) => {
+    stopScanning();
+    try {
+        await FleetAPI.linkBeacon(id as string, selectedUuid, BEACON_CONFIG.MAJOR, BEACON_CONFIG.MINOR);
+        setIsBound(true);
+    } catch (e: any) {
+        showAlert("BINDING FAILED", e.message || "Could not link beacon. Please ensure the UUID is unique.", "error");
+    }
+  };
+
+  // Phase 4 Edge Case handling
+  if (bluetoothState === 'PoweredOff') {
+    return (
+      <AppScreen centered>
+         <AppText variant="displaySm" color="danger">BLUETOOTH OFF</AppText>
+         <AppText variant="body" color="muted" center style={{ marginTop: Spacing.md }}>
+           Please enable Bluetooth to continue with this deployment task.
+         </AppText>
+      </AppScreen>
+    );
+  }
 
   return (
     <AppScreen>
@@ -47,9 +64,11 @@ export default function TaskExecutionScreen() {
         isPlaced={isPlaced}
         onTogglePlaced={() => setIsPlaced(!isPlaced)}
         isScanning={isScanning}
-        onScan={startScanning}
+        onScan={handleScan}
         isBound={isBound}
         rssi={rawRssi}
+        scannedDevicesList={scannedDevicesList}
+        onBind={handleBindBeacon}
       />
 
       <View style={{ marginTop: Spacing.xxl, opacity: isBound ? 1 : 0.4 }}>

@@ -1,70 +1,38 @@
 import React from 'react';
-import { StyleSheet, TouchableOpacity, View, ViewStyle } from 'react-native';
-import { CardBorder, Colors, Shadows, Spacing } from '../../constants/theme';
+import { TouchableOpacity, View } from 'react-native';
 
 interface AppCardProps {
   children: React.ReactNode;
   onPress?: () => void;
-  style?: ViewStyle;
+  className?: string;
   disabled?: boolean;
   variant?: 'default' | 'success' | 'info' | 'warning' | 'danger' | 'dark';
   padded?: boolean;
-  row?: boolean;
 }
 
-export function AppCard({
-  children,
-  onPress,
-  style,
-  disabled = false,
-  variant = 'default',
-  padded = true,
-  row = false,
-}: AppCardProps) {
-  const variantStyle = variantStyles[variant];
+export function AppCard({ children, onPress, className = '', disabled, variant = 'default', padded = true }: AppCardProps) {
+  
+  const getVariantClasses = () => {
+    switch (variant) {
+      case 'success': return 'bg-emerald-100 border-emerald-700 dark:bg-emerald-950 dark:border-emerald-500';
+      case 'info': return 'bg-blue-100 border-blue-700 dark:bg-blue-950 dark:border-blue-500';
+      case 'warning': return 'bg-amber-100 border-amber-700 dark:bg-amber-950 dark:border-amber-500';
+      case 'danger': return 'bg-red-100 border-red-700 dark:bg-red-950 dark:border-red-500';
+      case 'dark': return 'bg-black border-black dark:bg-zinc-900 dark:border-zinc-700';
+      // NativeWind fixes mapping for default Card surfaces
+      default: return 'bg-white border-black dark:bg-zinc-950 dark:border-zinc-800';
+    }
+  };
 
-  const containerStyle = [
-    styles.base,
-    variantStyle,
-    padded && styles.padded,
-    row && styles.row,
-    disabled && styles.disabled,
-    style,
-  ];
+  const baseClasses = `border-2 border-b-[6px] border-r-[4px] rounded-xl mb-4 shadow-sm dark:shadow-none ${getVariantClasses()} ${padded ? 'p-5' : ''} ${disabled ? 'opacity-50' : ''} ${className}`;
 
   if (onPress) {
     return (
-      <TouchableOpacity
-        activeOpacity={0.8}
-        onPress={onPress}
-        disabled={disabled}
-        style={containerStyle}
-      >
+      <TouchableOpacity activeOpacity={0.8} onPress={onPress} disabled={disabled} className={baseClasses}>
         {children}
       </TouchableOpacity>
     );
   }
 
-  return <View style={containerStyle}>{children}</View>;
+  return <View className={baseClasses}>{children}</View>;
 }
-
-const styles = StyleSheet.create({
-  base: {
-    backgroundColor: Colors.surface,
-    ...CardBorder, // This works now
-    ...Shadows.md,
-    marginBottom: Spacing.lg,
-  },
-  padded: { padding: Spacing.xl },
-  row: { flexDirection: 'row', alignItems: 'center' },
-  disabled: { opacity: 0.5 },
-});
-
-const variantStyles = StyleSheet.create({
-  default: { backgroundColor: Colors.surface, borderColor: Colors.borderStrong },
-  success: { backgroundColor: Colors.successBg, borderColor: Colors.successBorder },
-  info: { backgroundColor: Colors.infoBg, borderColor: Colors.infoBorder },
-  warning: { backgroundColor: Colors.warningBg, borderColor: Colors.warningBorder },
-  danger: { backgroundColor: Colors.dangerBg, borderColor: Colors.dangerBorder },
-  dark: { backgroundColor: Colors.black, borderColor: Colors.black },
-});

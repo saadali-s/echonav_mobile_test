@@ -2,23 +2,25 @@ import { AppButton } from '@/components/ui/AppButton';
 import { AppCard } from '@/components/ui/AppCard';
 import { AppScreen } from '@/components/ui/AppScreen';
 import { AppText } from '@/components/ui/AppText';
-import { Colors, Spacing } from '@/constants/theme';
-import { useScanner } from '@/hooks/useScanner';
-import { FleetAPI } from '@/services/FleetAPI'; // <-- THE FIX: Import API
+import { useAppAlert } from '@/core/context/AlertContext';
+import { useScanner } from '@/core/hooks/useScanner';
+import { FleetAPI } from '@/core/services/FleetAPI'; 
 import { Feather } from '@expo/vector-icons';
 import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
 import React, { useEffect, useRef, useState } from 'react';
-import { Alert, Vibration, View } from 'react-native'; // <-- THE FIX: Added Alert
+import { Vibration, View } from 'react-native'; 
 
 export default function CalibrationScreen() {
   const { id } = useLocalSearchParams();
   const router = useRouter();
-  const { rssi: rawRssi, startScanning, stopScanning } = useScanner();
+  const { showAlert } = useAppAlert();
+  
+  const { rssi: rawRssi, startScanning, stopScanning, bluetoothState } = useScanner();
 
   const [isCalibrating, setIsCalibrating] = useState(false);
   const [progress, setProgress] = useState(0);
   const [baselineRssi, setBaselineRssi] = useState<number | null>(null);
-  const [isSaving, setIsSaving] = useState(false); // <-- THE FIX: Loading state for the commit
+  const [isSaving, setIsSaving] = useState(false); 
   
   const samplesRef = useRef<number[]>([]);
 
@@ -28,25 +30,30 @@ export default function CalibrationScreen() {
     }
   }, [rawRssi, isCalibrating]);
 
-  const startCalibration = () => {
+  const initiateCalibrationSequence = async () => {
+    try {
+      await startScanning();
+    } catch (err: any) {
+      showAlert('HARDWARE ERROR', err.message, 'error');
+      return;
+    }
+
     Vibration.vibrate(100);
     setIsCalibrating(true);
     setProgress(0);
     setBaselineRssi(null);
     samplesRef.current = [];
-    
-    startScanning();
 
     let currentProgress = 0;
     const interval = setInterval(() => {
-      currentProgress += 2; // 2% every 100ms = 5 seconds total
+      currentProgress += 2; 
       setProgress(currentProgress);
 
       if (currentProgress >= 100) {
         clearInterval(interval);
         stopScanning();
         setIsCalibrating(false);
-        Vibration.vibrate([0, 200, 100, 200]); // "Success" vibration pattern
+        Vibration.vibrate([0, 200, 100, 200]); 
         
         const samples = samplesRef.current;
         if (samples.length > 0) {
@@ -59,68 +66,63 @@ export default function CalibrationScreen() {
     }, 100);
   };
 
-  // THE FIX: Asynchronously ship the baseline to the database
   const handleComplete = async () => {
     if (!baselineRssi) return;
 
     try {
       setIsSaving(true);
-      console.log(`[Calibration] Finalizing Task ${id} with Baseline: ${baselineRssi}`);
-      
       await FleetAPI.updateTaskStatus(id as string, 'VERIFIED', baselineRssi);
       
-      Alert.alert("Success", "Beacon calibrated and deployed successfully.");
-      router.replace('/staff/(tabs)' as any);
+      showAlert("SUCCESS", "Beacon calibrated and deployed successfully.", "success", "FINISH", () => {
+         router.replace('/staff/(tabs)' as any);
+      });
     } catch (error: any) {
-      console.error("[Calibration] Commit failed", error);
-      Alert.alert("Commit Error", error.message || "Failed to save the baseline to the database.");
+      showAlert("COMMIT ERROR", error.message || "Failed to save the baseline to the database.", "error");
     } finally {
       setIsSaving(false);
     }
   };
 
+  if (bluetoothState === 'PoweredOff') {
+    return (
+      <AppScreen centered>
+         <AppText variant="displaySm" color="danger">BLUETOOTH OFF</AppText>
+         <AppText variant="body" color="muted" center className="mt-3">
+           Please enable Bluetooth to continue calibration.
+         </AppText>
+      </AppScreen>
+    );
+  }
+
   return (
     <AppScreen>
       <Stack.Screen options={{ title: 'SIGNAL CALIBRATION', headerShown: true }} />
 
-      <View style={{ marginBottom: Spacing.xxl, alignItems: 'center' }}>
-        <View style={{ 
-          width: 80, height: 80, borderRadius: 40, 
-          backgroundColor: Colors.borderLight, 
-          justifyContent: 'center', alignItems: 'center',
-          borderWidth: 2, borderColor: Colors.black,
-          marginBottom: Spacing.lg
-        }}>
-          <Feather name="crosshair" size={32} color={Colors.black} />
+      <View className="mb-8 items-center">
+        <View className="w-20 h-20 rounded-full bg-zinc-100 dark:bg-zinc-900 justify-center items-center border-2 border-black dark:border-zinc-700 mb-4">
+          <Feather name="crosshair" size={32} className="text-black dark:text-white" />
         </View>
         <AppText variant="displayMd" center>Baseline Setup</AppText>
-        <AppText variant="bodySm" color="secondary" center style={{ marginTop: Spacing.xs }}>
+        <AppText variant="bodySm" color="secondary" center className="mt-1">
           Stand exactly 1 meter away from the beacon at chest height.
         </AppText>
       </View>
 
       <AppCard variant={baselineRssi !== null ? 'success' : 'default'}>
         {baselineRssi === null ? (
-          <View style={{ gap: Spacing.xl }}>
+          <View className="gap-5">
             <View>
               <AppText variant="titleSm" center>Calibration Status</AppText>
-              <View style={{ 
-                height: 12, backgroundColor: Colors.borderLight, 
-                borderRadius: 6, marginTop: Spacing.md, overflow: 'hidden',
-                borderWidth: 1, borderColor: Colors.border
-              }}>
-                <View style={{ 
-                  height: '100%', width: `${progress}%`, 
-                  backgroundColor: Colors.black 
-                }} />
+              <View className="h-3 bg-zinc-200 dark:bg-zinc-800 rounded-full mt-3 overflow-hidden border border-zinc-300 dark:border-zinc-700">
+                <View style={{ height: '100%', width: `${progress}%` }} className="bg-emerald-500 dark:bg-emerald-400" />
               </View>
-              <AppText variant="caption" color="secondary" center style={{ marginTop: Spacing.sm }}>
+              <AppText variant="caption" color="secondary" center className="mt-2">
                 {isCalibrating ? `SAMPLING DATA... ${progress}%` : 'READY TO START'}
               </AppText>
             </View>
 
             <AppButton 
-              onPress={startCalibration} 
+              onPress={initiateCalibrationSequence} 
               disabled={isCalibrating}
               loading={isCalibrating}
             >
@@ -128,11 +130,11 @@ export default function CalibrationScreen() {
             </AppButton>
           </View>
         ) : (
-          <View style={{ gap: Spacing.lg, alignItems: 'center' }}>
-            <Feather name="check-circle" size={48} color={Colors.successText} />
-            <View style={{ alignItems: 'center' }}>
+          <View className="gap-4 items-center">
+            <Feather name="check-circle" size={48} className="text-emerald-700 dark:text-emerald-500" />
+            <View className="items-center">
               <AppText variant="titleMd" color="success">CALIBRATION SUCCESSFUL</AppText>
-              <AppText variant="displayLg" style={{ marginTop: Spacing.sm }}>
+              <AppText variant="displayLg" className="mt-2">
                 {baselineRssi} <AppText variant="titleSm">dBm</AppText>
               </AppText>
               <AppText variant="caption" color="secondary">
@@ -152,7 +154,7 @@ export default function CalibrationScreen() {
         )}
       </AppCard>
 
-      <View style={{ marginTop: Spacing.xl, paddingHorizontal: Spacing.md }}>
+      <View className="mt-5 px-3">
         <AppText variant="caption" color="muted" center>
           Ensure no physical obstructions are between the phone and the beacon during sampling.
         </AppText>

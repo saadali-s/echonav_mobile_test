@@ -1,6 +1,6 @@
 import { useLocalSearchParams } from 'expo-router';
 import React from 'react';
-import { FloorPlanCanvas } from '../../../components/domain/FloorPlanCanvas';
+import { FloorPlanCanvas } from '../../../components/maps/FloorPlanCanvas';
 import { AppScreen } from '../../../components/ui/AppScreen';
 
 export default function VectorMapView() {

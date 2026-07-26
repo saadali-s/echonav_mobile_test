@@ -1,56 +1,68 @@
 import { AppCard } from '@/components/ui/AppCard';
 import { useRouter } from 'expo-router';
+import { useColorScheme } from 'nativewind';
 import React, { useEffect, useState } from 'react';
-import { ActivityIndicator, Alert, ScrollView, TouchableOpacity, View } from 'react-native';
-import { CompactTaskCard } from '../../../components/domain/CompactTaskCard';
-import { CompletedTaskTag } from '../../../components/domain/CompletedTaskTag';
-import { FloorPlanCard } from '../../../components/domain/FloorPlanCard';
-import { StaffHeader } from '../../../components/domain/StaffHeader';
+import { ActivityIndicator, RefreshControl, ScrollView, TouchableOpacity, View } from 'react-native';
+import { CompactTaskCard } from '../../../components/fleet/CompactTaskCard';
+import { CompletedTaskTag } from '../../../components/fleet/CompletedTaskTag';
+import { FloorPlanCard } from '../../../components/maps/FloorPlanCard';
+import { StaffHeader } from '../../../components/staff/StaffHeader';
 import { AppScreen } from '../../../components/ui/AppScreen';
 import { AppText } from '../../../components/ui/AppText';
-import { Colors, Spacing } from '../../../constants/theme';
-import { useAuth } from '../../../context/AuthContext';
-import { DashboardAPI } from '../../../services/DashboardAPI';
-import { FleetAPI } from '../../../services/FleetAPI';
+import { useAppAlert } from '../../../core/context/AlertContext';
+import { useAuth } from '../../../core/context/AuthContext';
+import { DashboardAPI } from '../../../core/services/DashboardAPI';
+import { FleetAPI } from '../../../core/services/FleetAPI';
 
 export default function StaffHome() {
   const router = useRouter();
+  const { colorScheme } = useColorScheme();
   const { orgId, userId, logout } = useAuth();
+  const { showAlert } = useAppAlert();
 
   const [isLoading, setIsLoading] = useState(true);
+  const [isRefreshing, setIsRefreshing] = useState(false);
   const [dashboardData, setDashboardData] = useState<any>(null);
   const [tasks, setTasks] = useState<any[]>([]);
 
+  const fetchDashboardData = async () => {
+    if (!orgId || !userId) return;
+    try {
+      const [dashRes, tasksRes] = await Promise.all([
+        DashboardAPI.getDashboardData(orgId),
+        FleetAPI.getStaffTasks(userId)
+      ]);
+      setDashboardData(dashRes);
+      setTasks(tasksRes);
+    } catch (error: any) {
+      showAlert("SYNC ERROR", error.message || "Failed to load dashboard data.", "error");
+    }
+  };
+
   useEffect(() => {
-    const loadDashboard = async () => {
-      if (!orgId || !userId) return;
-      try {
-        setIsLoading(true);
-        const [dashRes, tasksRes] = await Promise.all([
-          DashboardAPI.getDashboardData(orgId),
-          FleetAPI.getStaffTasks(userId)
-        ]);
-        setDashboardData(dashRes);
-        setTasks(tasksRes);
-      } catch (error: any) {
-        Alert.alert("Sync Error", error.message || "Failed to load dashboard data.");
-      } finally {
-        setIsLoading(false);
-      }
+    const initLoad = async () => {
+      setIsLoading(true);
+      await fetchDashboardData();
+      setIsLoading(false);
     };
-    loadDashboard();
+    initLoad();
   }, [orgId, userId]);
+
+  const handleRefresh = async () => {
+    setIsRefreshing(true);
+    await fetchDashboardData();
+    setIsRefreshing(false);
+  };
 
   const handleLogout = async () => {
     await logout();
-    // THE FIX: Explicitly force the app back to the radar screen
     router.replace('/');
   };
 
   if (isLoading || !dashboardData) {
     return (
       <AppScreen centered padded={false}>
-        <ActivityIndicator size="large" color={Colors.black} />
+        <ActivityIndicator size="large" color={colorScheme === 'dark' ? '#10b981' : '#000'} />
       </AppScreen>
     );
   }
@@ -62,23 +74,27 @@ export default function StaffHome() {
     <AppScreen padded={false} scrollable={false}>
       <StaffHeader name={dashboardData.userName || "Operator"} onLogout={handleLogout} />
       
-      <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 100 }}>
+      <ScrollView 
+        showsVerticalScrollIndicator={false} 
+        contentContainerStyle={{ paddingBottom: 100 }}
+        refreshControl={<RefreshControl refreshing={isRefreshing} onRefresh={handleRefresh} tintColor="#10b981" colors={['#10b981']} />}
+      >
         
         {completedTasks.length > 0 && (
-          <View style={{ marginTop: Spacing.lg, marginBottom: Spacing.sm }}>
-            <View style={{ paddingHorizontal: Spacing.xl, marginBottom: Spacing.sm }}>
+          <View className="mt-5 mb-2">
+            <View className="px-5 mb-2">
               <AppText variant="label" color="muted">Recently Completed</AppText>
             </View>
-            <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ paddingHorizontal: Spacing.xl, gap: Spacing.sm }}>
+            <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ paddingHorizontal: 20, gap: 8 }}>
               {completedTasks.map(t => (
-                <CompletedTaskTag key={t.id} title={`Node #${t.nodeId}`} />
+                <CompletedTaskTag key={t.id} title={`Node #${t.nodeLabel}`} />
               ))}
             </ScrollView>
           </View>
         )}
 
-        <View style={{ paddingHorizontal: Spacing.xl, marginTop: Spacing.md }}>
-          <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: Spacing.md }}>
+        <View className="px-5 mt-4">
+          <View className="flex-row justify-between items-baseline mb-3">
             <AppText variant="titleMd">Priority Queue</AppText>
             <TouchableOpacity onPress={() => router.push('/staff/tasks' as any)}>
               <AppText variant="caption" color="link">View All</AppText>
@@ -94,7 +110,7 @@ export default function StaffHome() {
               <CompactTaskCard 
                 key={task.id}
                 title={task.status === 'IN_PROGRESS' ? 'Calibrate Node' : 'Deploy Beacon'} 
-                location={`Map Node #${task.nodeId}`} 
+                location={task.nodeLabel}
                 status={task.status === 'TO_DO' ? 'PENDING' : 'IN_PROGRESS'} 
                 onPress={() => router.push(`/staff/task/${task.id}` as any)} 
               />
@@ -102,14 +118,14 @@ export default function StaffHome() {
           )}
         </View>
 
-        <View style={{ marginTop: Spacing.xxl }}>
-          <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'baseline', paddingHorizontal: Spacing.xl, marginBottom: Spacing.md }}>
+        <View className="mt-8">
+          <View className="flex-row justify-between items-baseline px-5 mb-3">
             <AppText variant="titleMd">Recent Maps</AppText>
             <TouchableOpacity onPress={() => router.push('/staff/maps' as any)}>
               <AppText variant="caption" color="link">View All</AppText>
             </TouchableOpacity>
           </View>
-          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ paddingLeft: Spacing.xl, paddingRight: Spacing.sm }}>
+          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ paddingLeft: 20, paddingRight: 8 }}>
             {dashboardData.recentPlans?.length === 0 ? (
               <AppText variant="bodySm" color="muted">No maps available.</AppText>
             ) : (

@@ -1,21 +1,25 @@
 import { Feather } from '@expo/vector-icons';
 import { Tabs } from 'expo-router';
-import { Colors, Layouts } from '../../../constants/theme';
+import { useColorScheme } from 'nativewind';
+import React from 'react';
 
 export default function StaffTabsLayout() {
+  const { colorScheme } = useColorScheme();
+  const isDark = colorScheme === 'dark';
+
   return (
     <Tabs screenOptions={{
       headerShown: false,
       tabBarStyle: { 
-        height: Layouts.tabBarHeight, 
+        height: 100, // Increased height
         borderTopWidth: 3, 
-        borderTopColor: Colors.black, 
-        paddingBottom: 25, 
-        paddingTop: 12,
-        backgroundColor: Colors.white
+        borderTopColor: isDark ? '#27272a' : '#18181b', 
+        paddingBottom: 40, // Increased padding to clear system swipe bars/home buttons
+        paddingTop: 5,
+        backgroundColor: isDark ? '#09090b' : '#ffffff'
       },
-      tabBarActiveTintColor: Colors.black,
-      tabBarInactiveTintColor: Colors.textMuted,
+      tabBarActiveTintColor: isDark ? '#34d399' : '#10b981',
+      tabBarInactiveTintColor: isDark ? '#52525b' : '#a1a1aa',
       tabBarLabelStyle: { fontWeight: '900', textTransform: 'uppercase', fontSize: 10 }
     }}>
       <Tabs.Screen name="index" options={{ title: 'Home', tabBarIcon: ({color}) => <Feather name="home" size={20} color={color}/> }} />

@@ -1,49 +1,35 @@
 import React from 'react';
-import { KeyboardAvoidingView, Platform, ScrollView, StyleSheet, View, ViewStyle } from 'react-native';
-import { Colors, Spacing } from '../../constants/theme';
+import { KeyboardAvoidingView, Platform, ScrollView, View } from 'react-native';
 
 interface AppScreenProps {
   children: React.ReactNode;
-  style?: ViewStyle;
+  className?: string;
   padded?: boolean;
   scrollable?: boolean;
   keyboardAvoiding?: boolean;
-  dark?: boolean;
   centered?: boolean;
 }
 
-export function AppScreen({
-  children,
-  style,
-  padded = true,
-  scrollable = true,
-  keyboardAvoiding = false,
-  dark = false,
-  centered = false,
-}: AppScreenProps) {
-  const containerStyle = [
-    styles.base,
-    dark && styles.dark,
-    centered && styles.centered,
-    style,
-  ];
+// THE FIX: Removed the 'dark' prop entirely. Backgrounds now correctly adapt to the theme toggle.
+export function AppScreen({ children, className = '', padded = true, scrollable = true, keyboardAvoiding = false, centered = false }: AppScreenProps) {
+  
+  const bgClass = 'bg-[#fafafa] dark:bg-black';
+  const layoutClass = centered ? 'justify-center items-center' : '';
+  const padClass = padded ? 'px-5 py-4' : '';
 
   const content = scrollable ? (
-    <ScrollView
-      style={styles.base}
-      contentContainerStyle={[
-        styles.scrollContent,
-        padded && styles.padded,
-        dark && styles.dark,
-        centered && styles.centered,
-      ]}
+    <ScrollView 
+      className={`flex-1 ${bgClass}`}
+      contentContainerStyle={{ flexGrow: 1, paddingBottom: 40 }}
       showsVerticalScrollIndicator={false}
       keyboardShouldPersistTaps="handled"
     >
-      {children}
+      <View className={`flex-1 ${padClass} ${layoutClass} ${className}`}>
+        {children}
+      </View>
     </ScrollView>
   ) : (
-    <View style={[containerStyle, padded && styles.padded]}>
+    <View className={`flex-1 ${bgClass} ${padClass} ${layoutClass} ${className}`}>
       {children}
     </View>
   );
@@ -51,9 +37,8 @@ export function AppScreen({
   if (keyboardAvoiding) {
     return (
       <KeyboardAvoidingView
-        style={[styles.base, dark && styles.dark]}
+        className={`flex-1 ${bgClass}`}
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-        // Ensures a small buffer above the keyboard so the input isn't flush against it
         keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 20} 
       >
         {content}
@@ -63,13 +48,3 @@ export function AppScreen({
 
   return content;
 }
-
-const styles = StyleSheet.create({
-  base: { flex: 1, backgroundColor: Colors.background },
-  dark: { backgroundColor: Colors.black },
-  padded: { paddingHorizontal: Spacing.xl, paddingVertical: Spacing.lg },
-  centered: { justifyContent: 'center', alignItems: 'center' },
-  // flexGrow is critical here; it tells the ScrollView to fill the available space, 
-  // allowing the KeyboardAvoidingView to compress it properly.
-  scrollContent: { flexGrow: 1, paddingBottom: Spacing.section }, 
-});
