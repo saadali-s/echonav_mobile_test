@@ -4,6 +4,7 @@ import React, { useEffect, useRef, useState } from 'react';
 import { PanResponder, TouchableOpacity, Vibration, View } from 'react-native';
 import { AppScreen } from '../ui/AppScreen';
 import { AppText } from '../ui/AppText';
+import { AppButton } from '../ui/AppButton';
 
 export function DirectoryView({ 
   currentNodeLabel, startNodeId, allNodes, directoryAudioMap, onClose, onSelectDestination 
@@ -13,7 +14,6 @@ export function DirectoryView({
   const soundRef = useRef<Audio.Sound | null>(null);
   const lastDy = useRef(0);
   const accumulatedDy = useRef(0);
-  const lastTapTime = useRef(0);
 
   useEffect(() => {
     if (allNodes.length === 0) return;
@@ -71,21 +71,13 @@ export function DirectoryView({
           accumulatedDy.current = 0;
         }
       },
-      onPanResponderRelease: (_, gestureState) => {
-        if (Math.abs(gestureState.dx) < 10 && Math.abs(gestureState.dy) < 10) {
-          const now = Date.now();
-          if (now - lastTapTime.current < 400) {
-            handleDoubleTap();
-            lastTapTime.current = 0; 
-          } else {
-            lastTapTime.current = now;
-          }
-        }
-      }
+      // THE FIX: Removed double-tap logic entirely to prevent swipe conflicts
+      onPanResponderRelease: () => {}
     })
   ).current;
 
-  const handleDoubleTap = () => {
+  // THE FIX: Explicit button trigger function
+  const handleConfirmRoute = () => {
     if (allNodes.length === 0) return;
     const selectedNode = allNodes[selectedIndex];
     
@@ -117,7 +109,6 @@ export function DirectoryView({
                 opacity: Math.max(0.1, 1 - Math.abs(offset) * 0.4),
                 borderColor: isCenter ? '#10b981' : 'transparent',
                 borderWidth: isCenter ? 2 : 0,
-                // THE FIX: Dial background updates properly in dark mode
                 backgroundColor: isCenter ? 'rgba(128,128,128,0.1)' : 'transparent'
             }}
         >
@@ -156,12 +147,22 @@ export function DirectoryView({
       <View className="flex-1 bg-zinc-50 dark:bg-black justify-center overflow-hidden" {...panResponder.panHandlers}>
         <View className="absolute top-8 w-full items-center z-10">
             <AppText variant="label" color="muted" center>SWIPE ANYWHERE TO SPIN DIAL</AppText>
-            <AppText variant="caption" color="muted" center>DOUBLE-TAP TO CONFIRM</AppText>
         </View>
         
         <View className="h-[100px] justify-center items-center">
             {renderRotaryItems()}
         </View>
+      </View>
+
+      {/* THE FIX: Explicit, unbreakable confirmation button */}
+      <View className="p-6 bg-white dark:bg-[#111] border-t border-zinc-200 dark:border-[#333]">
+        <AppButton 
+            variant="primary" 
+            onPress={handleConfirmRoute}
+            icon="navigation"
+        >
+            SET DESTINATION
+        </AppButton>
       </View>
 
     </AppScreen>

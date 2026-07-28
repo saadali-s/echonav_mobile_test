@@ -15,11 +15,10 @@ export default function NavigateScreen() {
   const {
     navState, isLoading, allNodes, currentNodeInfo, activeRoute, currentTargetIndex,
     isScanning, distance, isSpinning, triggerAudio, handleSelectDestination,
-    handleCancelRoute, directoryAudioMap
+    handleCancelRoute, directoryAudioMap, activeStartNodeId
   } = useNavigationController(startNodeId as string, floorPlanId as string);
 
   if (isLoading) {
-    // THE FIX: Removed `dark` prop
     return (
       <AppScreen centered padded={false}>
         <ActivityIndicator size="large" color="#10b981" />
@@ -48,8 +47,8 @@ export default function NavigateScreen() {
 
   return (
     <DirectoryView 
-      currentNodeLabel={currentNodeInfo?.label || `Node ${startNodeId}`}
-      startNodeId={startNodeId as string}
+      currentNodeLabel={currentNodeInfo?.label || `Node ${activeStartNodeId}`}
+      startNodeId={activeStartNodeId}
       allNodes={allNodes}
       directoryAudioMap={directoryAudioMap}
       onClose={() => router.replace('/')}

@@ -10,5 +10,5 @@ export const BEACON_CONFIG = {
   DEVICE_NAME: "IndoorNav_Beacon",
 };
 
-// THE FIX: Reroute to Port 8080 where we just exposed the resource folder
-export const TTS_BASE_URL = process.env.EXPO_PUBLIC_API_URL || "http://192.168.3.112:8080";
+const rawApiUrl = process.env.EXPO_PUBLIC_API_URL || "http://192.168.3.112:8080/api";
+export const TTS_BASE_URL = rawApiUrl.replace(/\/api\/?$/, '');

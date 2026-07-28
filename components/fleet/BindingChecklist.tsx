@@ -1,6 +1,7 @@
 import { Feather } from '@expo/vector-icons';
 import React from 'react';
-import { View } from 'react-native';
+// THE FIX: Added ScrollView to the imports
+import { View, ScrollView } from 'react-native';
 import { AppButton } from '../ui/AppButton';
 import { AppCard } from '../ui/AppCard';
 import { AppText } from '../ui/AppText';
@@ -40,20 +41,32 @@ export function BindingChecklist({
                 <AppText color="muted" center className="my-3">Listening for BLE packets...</AppText>
             )}
             
+            {/* THE FIX: Wrapped the list in a constrained ScrollView */}
             {isScanning && scannedDevicesList.length > 0 && (
-                <View className="gap-3 mt-3">
-                    {scannedDevicesList.map((device: any) => (
-                        <View key={device.uuid} className="flex-row items-center justify-between bg-zinc-100 dark:bg-zinc-900 p-3 rounded-xl border-2 border-borderStrong dark:border-zinc-700">
-                            <View className="flex-1">
-                                <AppText variant="label" numberOfLines={1}>{device.uuid.split('-')[0].toUpperCase()}...{device.uuid.split('-').pop()?.toUpperCase()}</AppText>
-                                <AppText variant="caption" color="muted">SIGNAL STRENGTH: {device.rssi} dBm</AppText>
-                            </View>
-                            <AppButton compact onPress={() => onBind(device.uuid)} className="w-20">
-                                BIND
-                            </AppButton>
-                        </View>
-                    ))}
-                </View>
+                <ScrollView 
+                  className="mt-3 max-h-64" 
+                  showsVerticalScrollIndicator={true}
+                  nestedScrollEnabled={true}
+                >
+                  <View className="gap-3 pb-2">
+                      {scannedDevicesList.map((device: any) => (
+                          <View key={device.uuid} className="flex-row items-center justify-between bg-zinc-100 dark:bg-zinc-900 p-3 rounded-xl border-2 border-borderStrong dark:border-zinc-700">
+                              <View className="flex-1 mr-3">
+                                  {/* THE FIX: Removed the split/pop truncation and numberOfLines. Added line-height and margin. */}
+                                  <AppText variant="label" className="leading-5">
+                                    {device.uuid.toUpperCase()}
+                                  </AppText>
+                                  <AppText variant="caption" color="muted" className="mt-1">
+                                    SIGNAL STRENGTH: {device.rssi} dBm
+                                  </AppText>
+                              </View>
+                              <AppButton compact onPress={() => onBind(device.uuid)} className="w-20 shrink-0">
+                                  BIND
+                              </AppButton>
+                          </View>
+                      ))}
+                  </View>
+                </ScrollView>
             )}
           </View>
         ) : (
