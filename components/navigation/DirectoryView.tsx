@@ -174,7 +174,6 @@ export function DirectoryView({
         </View>
       </View>
 
-      {}
       <View className="p-6 bg-white dark:bg-[#111] border-t border-zinc-200 dark:border-[#333]">
         <AppButton
           variant="primary"

@@ -28,7 +28,6 @@ export function PairingModal({
   return (
     <Modal visible={visible} animationType="slide" transparent>
       <View className="flex-1 bg-black/70">
-        {}
         <KeyboardAvoidingView behavior="padding" className="flex-1">
           <ScrollView
             contentContainerStyle={{ flexGrow: 1, justifyContent: "flex-end" }}

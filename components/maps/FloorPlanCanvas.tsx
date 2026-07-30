@@ -131,7 +131,6 @@ export function FloorPlanCanvas({ mapId }: FloorPlanCanvasProps) {
 
   return (
     <View className="flex-1 bg-zinc-100 dark:bg-[#111]">
-      {}
       <View
         pointerEvents="none"
         className="absolute top-5 left-4 z-50 bg-white/90 dark:bg-black/80 p-3 rounded-lg border-2 border-zinc-300 dark:border-[#333]"
@@ -144,7 +143,6 @@ export function FloorPlanCanvas({ mapId }: FloorPlanCanvasProps) {
         </AppText>
       </View>
 
-      {}
       {injectedHtml && (
         <WebView
           originWhitelist={["*"]}
@@ -158,7 +156,6 @@ export function FloorPlanCanvas({ mapId }: FloorPlanCanvasProps) {
         />
       )}
 
-      {}
       <View
         pointerEvents="none"
         className="absolute bottom-10 self-center bg-white/90 dark:bg-black/80 px-5 py-2 rounded-full border-2 border-zinc-300 dark:border-[#333] shadow-md"

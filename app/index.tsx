@@ -237,7 +237,6 @@ export default function RadarHomeScreen() {
 
       <Modal visible={showStaffLogin} transparent animationType="fade">
         <View className="flex-1 bg-black/70">
-          {}
           <KeyboardAvoidingView behavior="padding" className="flex-1">
             <ScrollView
               contentContainerStyle={{

@@ -60,7 +60,6 @@ export default function SettingsScreen() {
       </View>
 
       <ScrollView contentContainerStyle={{ padding: 20, gap: 16 }}>
-        {}
         <View className="gap-3 mb-2">
           <AppText variant="label" color="muted">
             Preferences

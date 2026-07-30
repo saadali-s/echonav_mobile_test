@@ -67,7 +67,6 @@ export function BindingChecklist({
               </AppText>
             )}
 
-            {}
             {isScanning && scannedDevicesList.length > 0 && (
               <ScrollView
                 className="mt-3 max-h-64"
@@ -81,7 +80,6 @@ export function BindingChecklist({
                       className="flex-row items-center justify-between bg-zinc-100 dark:bg-zinc-900 p-3 rounded-xl border-2 border-borderStrong dark:border-zinc-700"
                     >
                       <View className="flex-1 mr-3">
-                        {}
                         <AppText variant="label" className="leading-5">
                           {device.uuid.toUpperCase()}
                         </AppText>

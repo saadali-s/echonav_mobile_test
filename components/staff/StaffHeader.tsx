@@ -36,7 +36,6 @@ export function StaffHeader({
             <View className="absolute top-2 right-2 w-2.5 h-2.5 rounded-full bg-red-600 border-2 border-white dark:border-black" />
           </TouchableOpacity>
 
-          {}
           <TouchableOpacity
             onPress={onLogout}
             className="w-11 h-11 rounded-xl bg-red-500 dark:bg-red-600 border-2 border-red-700 dark:border-red-800 justify-center items-center"
