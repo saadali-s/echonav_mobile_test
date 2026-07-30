@@ -1,10 +1,10 @@
-import { useColorScheme } from 'nativewind';
-import React, { useEffect, useState } from 'react';
-import { ActivityIndicator, View } from 'react-native';
-import { WebView } from 'react-native-webview';
-import { ApiClient } from '../../core/services/ApiClient';
-import { MapStudioAPI } from '../../core/services/MapStudioAPI';
-import { AppText } from '../ui/AppText';
+import { useColorScheme } from "nativewind";
+import React, { useEffect, useState } from "react";
+import { ActivityIndicator, View } from "react-native";
+import { WebView } from "react-native-webview";
+import { ApiClient } from "../../core/services/ApiClient";
+import { MapStudioAPI } from "../../core/services/MapStudioAPI";
+import { AppText } from "../ui/AppText";
 
 const CANVAS_SIZE = 3000;
 
@@ -14,8 +14,8 @@ interface FloorPlanCanvasProps {
 
 export function FloorPlanCanvas({ mapId }: FloorPlanCanvasProps) {
   const { colorScheme } = useColorScheme();
-  const isDark = colorScheme === 'dark';
-  
+  const isDark = colorScheme === "dark";
+
   const [graphData, setGraphData] = useState<any>(null);
   const [injectedHtml, setInjectedHtml] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -27,29 +27,31 @@ export function FloorPlanCanvas({ mapId }: FloorPlanCanvasProps) {
         setGraphData(data);
 
         if (data?.floorPlan?.floorPlanUrl) {
-          const cleanEndpoint = data.floorPlan.floorPlanUrl.replace('/api', '');
+          const cleanEndpoint = data.floorPlan.floorPlanUrl.replace("/api", "");
           const svgString = await ApiClient.get<string>(cleanEndpoint);
-          
-          // Theme Colors
-          const bgColor = isDark ? '#111111' : '#f4f4f5';
-          const gridColor = isDark ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.05)';
 
-          // Generate Nodes natively in HTML for maximum performance
-          const nodesHtml = data.nodes?.map((node: any) => {
-            const isHazard = node.isHazard;
-            const label = node.label || `N-${node.id}`;
-            const bgClass = isHazard ? '#fee2e2' : '#10b981';
-            const borderClass = isHazard ? '#dc2626' : '#000000';
-            const textCol = isHazard ? '#dc2626' : '#ffffff';
-            
-            return `
+          const bgColor = isDark ? "#111111" : "#f4f4f5";
+          const gridColor = isDark
+            ? "rgba(255,255,255,0.05)"
+            : "rgba(0,0,0,0.05)";
+
+          const nodesHtml =
+            data.nodes
+              ?.map((node: any) => {
+                const isHazard = node.isHazard;
+                const label = node.label || `N-${node.id}`;
+                const bgClass = isHazard ? "#fee2e2" : "#10b981";
+                const borderClass = isHazard ? "#dc2626" : "#000000";
+                const textCol = isHazard ? "#dc2626" : "#ffffff";
+
+                return `
               <div class="node" style="left: ${node.x - 24}px; top: ${node.y - 24}px; background-color: ${bgClass}; border-color: ${borderClass}; color: ${textCol};">
                 ${label}
               </div>
             `;
-          }).join('') || '';
+              })
+              .join("") || "";
 
-          // Offload panning, zooming, grid rendering, and node rendering to the native web engine
           setInjectedHtml(`
             <!DOCTYPE html>
             <html>
@@ -120,26 +122,34 @@ export function FloorPlanCanvas({ mapId }: FloorPlanCanvasProps) {
     return (
       <View className="flex-1 bg-zinc-100 dark:bg-[#111] justify-center items-center">
         <ActivityIndicator size="large" color="#10b981" />
-        <AppText variant="caption" color="muted" className="mt-3">LOADING VECTOR DATA...</AppText>
+        <AppText variant="caption" color="muted" className="mt-3">
+          LOADING VECTOR DATA...
+        </AppText>
       </View>
     );
   }
 
   return (
     <View className="flex-1 bg-zinc-100 dark:bg-[#111]">
-      
-      {/* UI Overlay */}
-      <View pointerEvents="none" className="absolute top-5 left-4 z-50 bg-white/90 dark:bg-black/80 p-3 rounded-lg border-2 border-zinc-300 dark:border-[#333]">
-        <AppText variant="titleSm" color="primary">MODE: VECTOR_INSPECTION</AppText>
-        <AppText variant="caption" color="muted">ID_REF: {mapId} | NODES: {graphData?.nodes?.length || 0}</AppText>
+      {}
+      <View
+        pointerEvents="none"
+        className="absolute top-5 left-4 z-50 bg-white/90 dark:bg-black/80 p-3 rounded-lg border-2 border-zinc-300 dark:border-[#333]"
+      >
+        <AppText variant="titleSm" color="primary">
+          MODE: VECTOR_INSPECTION
+        </AppText>
+        <AppText variant="caption" color="muted">
+          ID_REF: {mapId} | NODES: {graphData?.nodes?.length || 0}
+        </AppText>
       </View>
 
-      {/* Hardware-Accelerated WebView handles Pinch-to-Zoom and Panning natively */}
+      {}
       {injectedHtml && (
-        <WebView 
-          originWhitelist={['*']}
-          source={{ html: injectedHtml }} 
-          style={{ backgroundColor: 'transparent', flex: 1 }} 
+        <WebView
+          originWhitelist={["*"]}
+          source={{ html: injectedHtml }}
+          style={{ backgroundColor: "transparent", flex: 1 }}
           scrollEnabled={true}
           scalesPageToFit={true}
           bounces={false}
@@ -148,9 +158,14 @@ export function FloorPlanCanvas({ mapId }: FloorPlanCanvasProps) {
         />
       )}
 
-      {/* Helper Text */}
-      <View pointerEvents="none" className="absolute bottom-10 self-center bg-white/90 dark:bg-black/80 px-5 py-2 rounded-full border-2 border-zinc-300 dark:border-[#333] shadow-md">
-         <AppText variant="caption" color="primary">Pinch to Zoom • Drag to Pan</AppText>
+      {}
+      <View
+        pointerEvents="none"
+        className="absolute bottom-10 self-center bg-white/90 dark:bg-black/80 px-5 py-2 rounded-full border-2 border-zinc-300 dark:border-[#333] shadow-md"
+      >
+        <AppText variant="caption" color="primary">
+          Pinch to Zoom • Drag to Pan
+        </AppText>
       </View>
     </View>
   );

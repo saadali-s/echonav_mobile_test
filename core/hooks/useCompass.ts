@@ -1,5 +1,5 @@
-import { Magnetometer } from 'expo-sensors';
-import { useEffect, useState } from 'react';
+import { Magnetometer } from "expo-sensors";
+import { useEffect, useState } from "react";
 
 export const useCompass = () => {
   const [heading, setHeading] = useState(0);
@@ -10,8 +10,7 @@ export const useCompass = () => {
     const startCompass = async () => {
       const isAvailable = await Magnetometer.isAvailableAsync();
       if (isAvailable) {
-        // Slowed down from 100 to 500 to stop freezing the UI!
-        Magnetometer.setUpdateInterval(500); 
+        Magnetometer.setUpdateInterval(500);
         subscription = Magnetometer.addListener((data) => {
           let angle = Math.atan2(data.y, data.x) * (180 / Math.PI);
           if (angle < 0) angle += 360;

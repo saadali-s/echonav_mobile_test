@@ -1,6 +1,5 @@
 /** @type {import('tailwindcss').Config} */
 module.exports = {
-  // THE FIX: Enables manual Dark Mode toggling
   darkMode: 'class', 
   content: [
     "./app/**/*.{js,jsx,ts,tsx}",

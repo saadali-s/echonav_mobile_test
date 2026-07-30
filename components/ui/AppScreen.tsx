@@ -1,5 +1,5 @@
-import React from 'react';
-import { KeyboardAvoidingView, Platform, ScrollView, View } from 'react-native';
+import React from "react";
+import { KeyboardAvoidingView, Platform, ScrollView, View } from "react-native";
 
 interface AppScreenProps {
   children: React.ReactNode;
@@ -10,15 +10,20 @@ interface AppScreenProps {
   centered?: boolean;
 }
 
-// THE FIX: Removed the 'dark' prop entirely. Backgrounds now correctly adapt to the theme toggle.
-export function AppScreen({ children, className = '', padded = true, scrollable = true, keyboardAvoiding = false, centered = false }: AppScreenProps) {
-  
-  const bgClass = 'bg-[#fafafa] dark:bg-black';
-  const layoutClass = centered ? 'justify-center items-center' : '';
-  const padClass = padded ? 'px-5 py-4' : '';
+export function AppScreen({
+  children,
+  className = "",
+  padded = true,
+  scrollable = true,
+  keyboardAvoiding = false,
+  centered = false,
+}: AppScreenProps) {
+  const bgClass = "bg-[#fafafa] dark:bg-black";
+  const layoutClass = centered ? "justify-center items-center" : "";
+  const padClass = padded ? "px-5 py-4" : "";
 
   const content = scrollable ? (
-    <ScrollView 
+    <ScrollView
       className={`flex-1 ${bgClass}`}
       contentContainerStyle={{ flexGrow: 1, paddingBottom: 40 }}
       showsVerticalScrollIndicator={false}
@@ -29,7 +34,9 @@ export function AppScreen({ children, className = '', padded = true, scrollable 
       </View>
     </ScrollView>
   ) : (
-    <View className={`flex-1 ${bgClass} ${padClass} ${layoutClass} ${className}`}>
+    <View
+      className={`flex-1 ${bgClass} ${padClass} ${layoutClass} ${className}`}
+    >
       {children}
     </View>
   );
@@ -38,8 +45,8 @@ export function AppScreen({ children, className = '', padded = true, scrollable 
     return (
       <KeyboardAvoidingView
         className={`flex-1 ${bgClass}`}
-        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-        keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 20} 
+        behavior={Platform.OS === "ios" ? "padding" : "height"}
+        keyboardVerticalOffset={Platform.OS === "ios" ? 0 : 20}
       >
         {content}
       </KeyboardAvoidingView>

@@ -1,10 +1,10 @@
-import { Audio } from 'expo-av';
-import { useCallback, useEffect, useRef, useState } from 'react';
-import { Vibration } from 'react-native';
-import { STATIC_AUDIO } from '../constants/AudioDictionary';
-import { useKinematics } from './useKinematics';
-import { usePDR } from './usePDR';
-import { useRSSIKalman } from './useRSSIKalman';
+import { Audio } from "expo-av";
+import { useCallback, useEffect, useRef, useState } from "react";
+import { Vibration } from "react-native";
+import { STATIC_AUDIO } from "../constants/AudioDictionary";
+import { useKinematics } from "./useKinematics";
+import { usePDR } from "./usePDR";
+import { useRSSIKalman } from "./useRSSIKalman";
 
 Audio.setAudioModeAsync({
   staysActiveInBackground: true,
@@ -13,73 +13,97 @@ Audio.setAudioModeAsync({
   playThroughEarpieceAndroid: false,
 });
 
-const STRIDE_LENGTH = 0.7; 
-const GHOST_WALK_SPEED = 1.4; // Simulated human walking speed in meters per second
+const STRIDE_LENGTH = 0.7;
+const GHOST_WALK_SPEED = 1.4;
 
 export const useFusionDistance = (
-    rawRSSI: number | null, 
-    calibratedBaseline: number,
-    targetUuid: string | null,
-    initialRouteDistance: number | null, 
-    audioUri: string | null = null,
-    maneuverCode: string | null = null,
-    onDestinationReached?: () => void 
+  rawRSSI: number | null,
+  calibratedBaseline: number,
+  targetUuid: string | null,
+  initialRouteDistance: number | null,
+  audioUri: string | null = null,
+  maneuverCode: string | null = null,
+  onDestinationReached?: () => void,
 ) => {
   const { filter: kalmanFilter, reset: resetKalman } = useRSSIKalman();
   const { steps } = usePDR();
-  const { isSpinning, hasTurnedAround, clearTurnWarning } = useKinematics(steps);
+  const { isSpinning, hasTurnedAround, clearTurnWarning } =
+    useKinematics(steps);
 
   const [distance, setFusedDistance] = useState<number | null>(null);
-  const [metrics, setMetrics] = useState({ rawRSSI: 0, smoothRSSI: 0, rawDist: 0 });
-  
+  const [metrics, setMetrics] = useState({
+    rawRSSI: 0,
+    smoothRSSI: 0,
+    rawDist: 0,
+  });
+
   const isNearRef = useRef<boolean>(false);
   const lastAnnouncementTime = useRef<number>(0);
-  
+
   const prevSteps = useRef<number>(0);
   const hybridDistanceRef = useRef<number | null>(null);
   const rssiBufferRef = useRef<number[]>([]);
-  
-  // Track exact millisecond timings to drive the Ghost Walker fallback
+
   const lastTickTimeRef = useRef<number>(Date.now());
 
   const callbackRef = useRef(onDestinationReached);
-  useEffect(() => { callbackRef.current = onDestinationReached; }, [onDestinationReached]);
+  useEffect(() => {
+    callbackRef.current = onDestinationReached;
+  }, [onDestinationReached]);
 
   useEffect(() => {
     if (initialRouteDistance !== null) {
-        hybridDistanceRef.current = initialRouteDistance;
-        prevSteps.current = steps; 
-        isNearRef.current = false;
-        rssiBufferRef.current = [];
-        lastTickTimeRef.current = Date.now();
-        console.log(`\n[Physics Engine] Route Booted. Compass aggressively locked to: ${initialRouteDistance}m`);
+      hybridDistanceRef.current = initialRouteDistance;
+      prevSteps.current = steps;
+      isNearRef.current = false;
+      rssiBufferRef.current = [];
+      lastTickTimeRef.current = Date.now();
+      console.log(
+        `\n[Physics Engine] Route Booted. Compass aggressively locked to: ${initialRouteDistance}m`,
+      );
     }
   }, [initialRouteDistance, targetUuid]);
 
-  const calculateBleDistance = (rssi: number) => Math.pow(10, (calibratedBaseline - rssi) / (10 * 2.5));
+  const calculateBleDistance = (rssi: number) =>
+    Math.pow(10, (calibratedBaseline - rssi) / (10 * 2.5));
 
-  const playAudioSequence = async (maneuver: string | null, uri: string | null) => {
+  const playAudioSequence = async (
+    maneuver: string | null,
+    uri: string | null,
+  ) => {
     try {
       if (maneuver && maneuver in STATIC_AUDIO) {
         const safeManeuver = maneuver as keyof typeof STATIC_AUDIO;
-        const { sound: maneuverSound } = await Audio.Sound.createAsync(STATIC_AUDIO[safeManeuver]);
+        const { sound: maneuverSound } = await Audio.Sound.createAsync(
+          STATIC_AUDIO[safeManeuver],
+        );
         await maneuverSound.playAsync();
-        await new Promise<void>((resolve) => maneuverSound.setOnPlaybackStatusUpdate((s: any) => { if (s.didJustFinish || s.error) resolve(); }));
+        await new Promise<void>((resolve) =>
+          maneuverSound.setOnPlaybackStatusUpdate((s: any) => {
+            if (s.didJustFinish || s.error) resolve();
+          }),
+        );
       }
       if (uri) {
         const { sound: ttsSound } = await Audio.Sound.createAsync({ uri });
         await ttsSound.playAsync();
-        await new Promise<void>((resolve) => ttsSound.setOnPlaybackStatusUpdate((s: any) => { if (s.didJustFinish || s.error) resolve(); }));
+        await new Promise<void>((resolve) =>
+          ttsSound.setOnPlaybackStatusUpdate((s: any) => {
+            if (s.didJustFinish || s.error) resolve();
+          }),
+        );
       }
     } catch (error) {}
   };
 
-  const triggerAudio = useCallback(() => playAudioSequence(maneuverCode, audioUri), [maneuverCode, audioUri]);
+  const triggerAudio = useCallback(
+    () => playAudioSequence(maneuverCode, audioUri),
+    [maneuverCode, audioUri],
+  );
 
   useEffect(() => {
     if (rawRSSI === null || hybridDistanceRef.current === null) return;
 
-    // Calculate time elapsed since the last frame
     const now = Date.now();
     const deltaSeconds = (now - lastTickTimeRef.current) / 1000;
     lastTickTimeRef.current = now;
@@ -88,59 +112,82 @@ export const useFusionDistance = (
     const bleDist = calculateBleDistance(smoothRSSI);
 
     rssiBufferRef.current.push(smoothRSSI);
-    if (rssiBufferRef.current.length > 4) rssiBufferRef.current.shift(); 
-    const avgRSSI = rssiBufferRef.current.reduce((a, b) => a + b, 0) / rssiBufferRef.current.length;
+    if (rssiBufferRef.current.length > 4) rssiBufferRef.current.shift();
+    const avgRSSI =
+      rssiBufferRef.current.reduce((a, b) => a + b, 0) /
+      rssiBufferRef.current.length;
 
     let currentDistance = hybridDistanceRef.current;
     const stepsTaken = steps - prevSteps.current;
 
     if (stepsTaken > 0) {
-        // Hardware Pedometer is awake: Deduct exact physical distance
-        if (!isSpinning) {
-            currentDistance -= (stepsTaken * STRIDE_LENGTH);
-            console.log(`[Physics Engine] Pedometer Fired. -${(stepsTaken * STRIDE_LENGTH).toFixed(2)}m`);
-        }
-        prevSteps.current = steps;
+      if (!isSpinning) {
+        currentDistance -= stepsTaken * STRIDE_LENGTH;
+        console.log(
+          `[Physics Engine] Pedometer Fired. -${(stepsTaken * STRIDE_LENGTH).toFixed(2)}m`,
+        );
+      }
+      prevSteps.current = steps;
     } else if (bleDist < currentDistance - 0.5) {
-        // Hardware Pedometer is asleep: The Ghost Walker takes over.
-        // If Bluetooth confirms we are physically closer than the compass thinks, simulate a human walking speed.
-        const simulatedDistanceDeduction = GHOST_WALK_SPEED * deltaSeconds;
-        currentDistance = Math.max(bleDist, currentDistance - simulatedDistanceDeduction);
+      const simulatedDistanceDeduction = GHOST_WALK_SPEED * deltaSeconds;
+      currentDistance = Math.max(
+        bleDist,
+        currentDistance - simulatedDistanceDeduction,
+      );
     }
 
     hybridDistanceRef.current = Math.max(0, currentDistance);
 
-    setMetrics({ rawRSSI, smoothRSSI: parseFloat(smoothRSSI.toFixed(1)), rawDist: parseFloat(bleDist.toFixed(2)) });
+    setMetrics({
+      rawRSSI,
+      smoothRSSI: parseFloat(smoothRSSI.toFixed(1)),
+      rawDist: parseFloat(bleDist.toFixed(2)),
+    });
 
-    // Distance-Based Arming (The Checkpoint)
-    const distanceThreshold = initialRouteDistance ? initialRouteDistance * 0.6 : 999; 
+    const distanceThreshold = initialRouteDistance
+      ? initialRouteDistance * 0.6
+      : 999;
     const isArmed = hybridDistanceRef.current <= distanceThreshold;
-    const isPhysicallyTouching = rssiBufferRef.current.length === 4 && avgRSSI >= (calibratedBaseline - 2);
+    const isPhysicallyTouching =
+      rssiBufferRef.current.length === 4 && avgRSSI >= calibratedBaseline - 2;
 
     if (isPhysicallyTouching && !isNearRef.current) {
-        if (!isArmed) {
-             // Suppress console spam so we only log a few warnings instead of flooding the JS bridge
-             if (Math.random() < 0.1) {
-                 console.log(`[Physics Engine] High Signal (${avgRSSI.toFixed(1)} dBm) IGNORED. Arming at < ${distanceThreshold.toFixed(1)}m. Current: ${hybridDistanceRef.current.toFixed(1)}m`);
-             }
-        } else if (now - lastAnnouncementTime.current > 8000) {
-            isNearRef.current = true;
-            lastAnnouncementTime.current = now;
-            console.log(`[Physics Engine] ARRIVAL CONFIRMED: 2-Sec Avg ${avgRSSI.toFixed(1)} dBm crossed Baseline ${calibratedBaseline} dBm.`);
-            
-            hybridDistanceRef.current = 0;
-            currentDistance = 0;
-
-            Vibration.vibrate([0, 400, 200, 400]); 
-            triggerAudio();
-            if (callbackRef.current) callbackRef.current();
+      if (!isArmed) {
+        if (Math.random() < 0.1) {
+          console.log(
+            `[Physics Engine] High Signal (${avgRSSI.toFixed(1)} dBm) IGNORED. Arming at < ${distanceThreshold.toFixed(1)}m. Current: ${hybridDistanceRef.current.toFixed(1)}m`,
+          );
         }
-    } else if (avgRSSI < (calibratedBaseline - 15)) {
-        isNearRef.current = false;
+      } else if (now - lastAnnouncementTime.current > 8000) {
+        isNearRef.current = true;
+        lastAnnouncementTime.current = now;
+        console.log(
+          `[Physics Engine] ARRIVAL CONFIRMED: 2-Sec Avg ${avgRSSI.toFixed(1)} dBm crossed Baseline ${calibratedBaseline} dBm.`,
+        );
+
+        hybridDistanceRef.current = 0;
+        currentDistance = 0;
+
+        Vibration.vibrate([0, 400, 200, 400]);
+        triggerAudio();
+        if (callbackRef.current) callbackRef.current();
+      }
+    } else if (avgRSSI < calibratedBaseline - 15) {
+      isNearRef.current = false;
     }
 
     setFusedDistance(parseFloat(currentDistance.toFixed(2)));
-  }, [rawRSSI, steps, kalmanFilter, calibratedBaseline, audioUri, maneuverCode, triggerAudio, isSpinning, initialRouteDistance]); 
+  }, [
+    rawRSSI,
+    steps,
+    kalmanFilter,
+    calibratedBaseline,
+    audioUri,
+    maneuverCode,
+    triggerAudio,
+    isSpinning,
+    initialRouteDistance,
+  ]);
 
   const resetFusion = useCallback(() => {
     resetKalman();
@@ -149,8 +196,17 @@ export const useFusionDistance = (
     prevSteps.current = 0;
     isNearRef.current = false;
     lastAnnouncementTime.current = 0;
-    rssiBufferRef.current = []; 
+    rssiBufferRef.current = [];
   }, [resetKalman]);
 
-  return { distance, metrics, resetFusion, steps, triggerAudio, isSpinning, hasTurnedAround, clearTurnWarning };
+  return {
+    distance,
+    metrics,
+    resetFusion,
+    steps,
+    triggerAudio,
+    isSpinning,
+    hasTurnedAround,
+    clearTurnWarning,
+  };
 };
